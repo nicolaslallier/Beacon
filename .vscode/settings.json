@@ -1,0 +1,74 @@
+{
+  // Docker file associations
+  "files.associations": {
+    "Dockerfile*": "dockerfile",
+    "*.dockerfile": "dockerfile",
+    "docker-compose*.yml": "dockercompose",
+    "docker-compose*.yaml": "dockercompose",
+    "compose*.yml": "dockercompose",
+    "compose*.yaml": "dockercompose"
+  },
+
+  // YAML formatting for compose files
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.autoIndent": "advanced"
+  },
+
+  "[dockercompose]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.quickSuggestions": {
+      "strings": true
+    }
+  },
+
+  // Dockerfile formatting
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker",
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+  },
+
+  // YAML schema validation
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json": [
+      "docker-compose*.yml",
+      "docker-compose*.yaml",
+      "compose*.yml",
+      "compose*.yaml"
+    ]
+  },
+
+  // Docker extension settings
+  "docker.showStartPage": false,
+  "docker.truncateLongRegistryPaths": true,
+  "docker.containers.sortBy": "CreatedTime",
+  "docker.images.sortBy": "CreatedTime",
+
+  // Terminal integration
+  "terminal.integrated.env.osx": {
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1"
+  },
+  "terminal.integrated.env.linux": {
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1"
+  },
+
+  // File exclusions for cleaner explorer
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true
+  },
+
+  // Editor settings for infrastructure files
+  "editor.formatOnSave": true,
+  "editor.rulers": [80, 120],
+
+  // Hadolint (Dockerfile linting) settings
+  "hadolint.hadolintPath": "hadolint"
+}

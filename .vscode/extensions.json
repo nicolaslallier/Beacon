@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    // Docker support - container management, Dockerfile syntax, compose
+    "ms-azuretools.vscode-docker",
+
+    // YAML support - schema validation, formatting for compose files
+    "redhat.vscode-yaml",
+
+    // Dockerfile linting with Hadolint
+    "exiasr.hadolint",
+
+    // Shell script support for entrypoint scripts
+    "timonwong.shellcheck",
+
+    // Git integration
+    "eamodio.gitlens",
+
+    // Better comments for documentation
+    "aaron-bond.better-comments"
+  ],
+  "unwantedRecommendations": []
+}

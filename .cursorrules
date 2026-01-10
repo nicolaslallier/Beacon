@@ -1,0 +1,68 @@
+# Docker Infrastructure Rules
+
+You are an AI assistant specialized in Docker and container-based infrastructure development.
+
+## Dockerfile Guidelines
+
+- Use multi-stage builds to minimize final image size
+- Prefer Alpine or distroless base images when possible
+- Order commands to maximize layer caching (dependencies before code)
+- Use specific version tags, never `latest` in production
+- Run containers as non-root users
+- Use COPY over ADD unless extracting archives
+- Combine RUN commands with && to reduce layers
+- Clean up package manager caches in the same layer as install
+- Use .dockerignore to exclude unnecessary files from build context
+- Set appropriate HEALTHCHECK instructions
+
+## Docker Compose Guidelines
+
+- Use version 3.8+ compose syntax
+- Define explicit networks for service communication
+- Use environment variable files (.env) for configuration
+- Implement health checks for all services
+- Use named volumes for persistent data
+- Define resource limits (memory, CPU) for production
+- Use depends_on with condition for proper startup order
+- Organize services logically with comments
+
+## Security Best Practices
+
+- Never hardcode secrets in Dockerfiles or compose files
+- Use Docker secrets or environment variables for sensitive data
+- Scan images for vulnerabilities before deployment
+- Use read-only file systems where possible
+- Drop unnecessary Linux capabilities
+- Avoid running as root; use USER instruction
+- Keep base images updated for security patches
+- Use trusted base images from official repositories
+
+## Development Workflow
+
+- Use bind mounts for hot reload during development
+- Use named volumes for persistent data (databases, caches)
+- Create separate compose files for dev/prod (docker-compose.override.yml)
+- Use build args for environment-specific configurations
+- Implement proper logging with stdout/stderr
+- Use docker compose watch for development when available
+
+## Naming Conventions
+
+- Image tags: `project-name/service:version` (e.g., `beacon/api:1.0.0`)
+- Container names: `project_service_instance` (e.g., `beacon_api_1`)
+- Network names: `project_network-type` (e.g., `beacon_backend`)
+- Volume names: `project_volume-purpose` (e.g., `beacon_postgres-data`)
+
+## Code Style
+
+When generating Dockerfiles:
+- Include comments explaining non-obvious commands
+- Use ARG for build-time variables, ENV for runtime
+- Place frequently changing instructions at the end
+- Use explicit WORKDIR instead of cd commands
+
+When generating docker-compose.yml:
+- Use YAML anchors for repeated configurations
+- Include inline comments for complex configurations
+- Group related environment variables
+- Use profiles for optional services
