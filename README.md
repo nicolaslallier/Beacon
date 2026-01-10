@@ -6,19 +6,47 @@ A production-ready, minimal reverse proxy image based on NGINX. Supports path-ba
 
 ## Quick Start
 
+### NGINX Only
+
 Clone the repository and run:
 
 ```bash
+make up
+# or
 docker compose up -d
 ```
 
 _NGINX will be available at http://localhost:80 by default._
 
+### With Monitoring Stack
+
+To start NGINX with the full observability stack (Grafana, Prometheus, Loki, Tempo):
+
+```bash
+# Set Grafana admin password first
+echo "GF_SECURITY_ADMIN_PASSWORD=your-secure-password" >> .env
+
+# Start everything
+make up-monitoring
+# or
+docker compose --profile monitoring up -d
+```
+
+_Grafana will be available at http://grafana.beacon.famillelallier.net (default admin/admin, change via env var)._
+
+To start only the monitoring stack (without NGINX):
+
+```bash
+make up-monitoring-only
+```
+
 ---
 
 ## Environment Configuration
 
-Create a `.env` file or export desired values before running. All configurable variables are shown below (see also `.env.example`).
+Create a `.env` file or export desired values before running. All configurable variables are shown below.
+
+### NGINX Variables
 
 | Variable             | Default    | Description                      |
 |----------------------|------------|----------------------------------|
@@ -27,14 +55,26 @@ Create a `.env` file or export desired values before running. All configurable v
 | UPSTREAM_WEB_PORT    | 3000       | Port for frontend                |
 | UPSTREAM_API_HOST    | api        | Host for API backend             |
 | UPSTREAM_API_PORT    | 8080       | Port for API backend             |
+| UPSTREAM_GRAFANA_HOST| grafana    | Host for Grafana container       |
+| UPSTREAM_GRAFANA_PORT| 3000       | Port for Grafana                 |
 | MAX_BODY_SIZE        | 50m        | Max upload size (e.g. file)      |
 | GZIP_ENABLED         | on         | Enable Gzip compression (on/off) |
 
-See `.env.example` for copy-paste starting values.
+### Monitoring Stack Variables
+
+| Variable                      | Default    | Description                              |
+|-------------------------------|------------|------------------------------------------|
+| GF_SECURITY_ADMIN_PASSWORD    | (required) | Grafana admin password (set in `.env`)   |
+
+**Note**: Grafana is accessed via NGINX proxy at `grafana.beacon.famillelallier.net`. The direct port mapping has been removed for security.
+
+**Important**: Set `GF_SECURITY_ADMIN_PASSWORD` in your `.env` file before starting the monitoring stack. Never commit passwords to version control.
 
 ---
 
 ## Architecture
+
+### NGINX Reverse Proxy
 
 ```mermaid
 flowchart TB
@@ -53,6 +93,55 @@ flowchart TB
 
 - NGINX acts as a reverse proxy and router. It can serve as an entrypoint for multiple services and enforce security and observability.
 - Static file serving is supported for frontend assets (if enabled).
+
+### Monitoring Stack (Optional)
+
+```mermaid
+graph TB
+    subgraph external [External Access]
+        User[Operator]
+    end
+    
+    subgraph monitoring [Monitoring Network]
+        Grafana[Grafana:3000]
+        Prometheus[Prometheus:9090]
+        Loki[Loki:3100]
+        Tempo[Tempo:4317/4318]
+    end
+    
+    subgraph collectors [Collection Agents]
+        Promtail[Promtail]
+        cAdvisor[cAdvisor:8080]
+        NodeExporter[node-exporter:9100]
+    end
+    
+    subgraph app [Application Network]
+        Nginx[beacon-nginx]
+    end
+    
+    User -->|grafana.beacon.famillelallier.net| Nginx
+    Nginx -->|proxy| Grafana
+    Grafana --> Prometheus
+    Grafana --> Loki
+    Grafana --> Tempo
+    
+    Prometheus --> cAdvisor
+    Prometheus --> NodeExporter
+    Prometheus --> Nginx
+    
+    Promtail -->|logs| Loki
+    
+    Nginx -.->|traces| Tempo
+```
+
+The monitoring stack provides:
+- **Grafana**: Unified dashboards for metrics, logs, and traces
+- **Prometheus**: Metrics collection and alerting
+- **Loki**: Log aggregation and querying
+- **Tempo**: Distributed tracing storage
+- **Promtail**: Log collection from Docker containers
+- **cAdvisor**: Container metrics
+- **node-exporter**: Host-level metrics
 
 ---
 
@@ -103,6 +192,88 @@ flowchart TB
 
 ---
 
+## Monitoring Stack Usage
+
+### Starting/Stopping
+
+```bash
+# Start NGINX + monitoring
+make up-monitoring
+
+# Start only monitoring stack
+make up-monitoring-only
+
+# Stop monitoring services
+make down-monitoring-only
+
+# View monitoring logs
+make monitoring-logs
+
+# Check monitoring service health
+make monitoring-status
+```
+
+### Accessing Grafana
+
+1. Open http://grafana.beacon.famillelallier.net
+2. Login with:
+   - Username: `admin`
+   - Password: Value from `GF_SECURITY_ADMIN_PASSWORD` env var
+3. Datasources (Prometheus, Loki, Tempo) are auto-provisioned
+4. Baseline dashboards are available:
+   - Services Overview
+   - Infrastructure Overview
+   - Logs Overview
+   - Stack Health
+
+### Prometheus Targets
+
+Prometheus scrapes:
+- `prometheus` (self-monitoring)
+- `node-exporter` (host metrics)
+- `cadvisor` (container metrics)
+- `loki` (Loki metrics)
+- `tempo` (Tempo metrics)
+
+Access Prometheus UI at http://localhost:9090 (internal network only).
+
+### Log Collection
+
+Promtail automatically collects logs from:
+- Docker containers (via Docker socket)
+- System logs (`/var/log/*.log`)
+
+Logs are labeled with:
+- `container`: Container name
+- `compose_service`: Docker Compose service name
+- `image`: Container image
+
+### Alert Rules
+
+Baseline alerts are configured in `monitoring/prometheus/rules/alerts.yml`:
+- TargetDown: Scrape target unreachable
+- HighErrorRate: HTTP 5xx > 5%
+- HighLatency: p95 latency > 500ms
+- HighCPU: Container CPU > 80%
+- HighMemory: Container memory > 80%
+- DiskSpaceLow: Disk usage > 85%
+
+### Data Retention
+
+- **Prometheus**: Configurable (default: 7-15 days)
+- **Loki**: 7 days (configurable in `monitoring/loki/loki-config.yml`)
+- **Tempo**: 7 days (configurable in `monitoring/tempo/tempo-config.yml`)
+
+### Persistence
+
+All monitoring data persists in Docker volumes:
+- `beacon_grafana-data`: Grafana state and dashboards
+- `beacon_prometheus-data`: Metrics TSDB
+- `beacon_loki-data`: Log chunks
+- `beacon_tempo-data`: Trace data
+
+---
+
 ## Troubleshooting
 
 - **Container won’t start?** Check `docker logs beacon-nginx` for error output.
@@ -115,3 +286,20 @@ flowchart TB
 Built based on requirements authored by Nicolas Lallier, 2026.
 
 ---
+
+### Monitoring Stack Issues
+
+- **Grafana password not working?** Grafana stores the admin password in its database. If you changed `GF_SECURITY_ADMIN_PASSWORD` in `.env` after Grafana was first started, reset Grafana: `make reset-grafana` then `make up-monitoring`. This deletes all Grafana data and recreates it with the new password.
+- **Grafana won't start?** Ensure `GF_SECURITY_ADMIN_PASSWORD` is set in `.env`.
+- **Environment variables not applied?** Restart containers after changing `.env`: `make down-monitoring && make up-monitoring`. Check variables: `make env-check`.
+- **Prometheus targets down?** Check network connectivity: `docker network inspect beacon_monitoring_net`.
+- **No logs in Loki?** Verify Promtail is running: `docker logs beacon-promtail`.
+- **Loki permission errors (`chown: Operation not permitted`)?** The Loki volume may have incorrect permissions. Recreate the volume:
+  ```bash
+  docker compose --profile monitoring stop loki
+  docker volume rm beacon_loki-data
+  docker compose --profile monitoring up -d loki
+  ```
+  The entrypoint script will create directories with correct permissions on the fresh volume.
+- **Config parsing errors?** Check service logs: `make monitoring-logs`.
+- **Dashboards not loading?** Verify datasources are provisioned: Grafana → Configuration → Data Sources.

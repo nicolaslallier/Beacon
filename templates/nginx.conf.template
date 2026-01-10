@@ -39,6 +39,45 @@ http {
         default http://${UPSTREAM_WEB_HOST}:${UPSTREAM_WEB_PORT};
     }
 
+    # Map for Grafana upstream
+    map "" ${DOLLAR}grafana_upstream {
+        default http://${UPSTREAM_GRAFANA_HOST}:${UPSTREAM_GRAFANA_PORT};
+    }
+
+    # Grafana server block
+    server {
+        listen 80;
+        server_name grafana.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Grafana proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}grafana_upstream;
+            
+            # Grafana-specific proxy settings
+            proxy_set_header X-WEBAUTH-USER $remote_user;
+            proxy_buffering off;
+            
+            # Additional proxy settings for Grafana
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
     # SERVER
     server {
         listen 80;

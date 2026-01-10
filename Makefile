@@ -27,10 +27,17 @@ help:
 	@printf "  make lint-nginx      # Test la conf NGINX\n"
 	@printf "\n## Docker Compose\n"
 	@printf "  make up              # Démarre les services\n"
+	@printf "  make up-monitoring   # Démarre les services avec monitoring\n"
+	@printf "  make up-monitoring-only   # Seulement la stack monitoring\n"
 	@printf "  make down            # Stoppe les services\n"
+	@printf "  make down-monitoring # Arrête tout avec monitoring\n"
+	@printf "  make down-monitoring-only # Stoppe uniquement la stack monitoring\n"
 	@printf "  make restart         # Redémarre les services\n"
 	@printf "  make logs            # Affiche les logs\n"
+	@printf "  make monitoring-logs    # Logs only monitoring services\n"
 	@printf "  make ps              # Montre le statut des services\n"
+	@printf "  make monitoring-status # Statut health monitoring\n"
+	@printf "  make reset-grafana   # Reset Grafana (delete data, use new password)\n"
 	@printf "\n## CI Pipeline\n"
 	@printf "  make ci              # Pipeline CI complet (lint + build)\n"
 	@printf "\n## Release/Deploy\n"
@@ -38,6 +45,7 @@ help:
 	@printf "\n## Info\n"
 	@printf "  make version         # Affiche la version\n"
 	@printf "  make info            # Affiche project/env/image\n"
+	@printf "  make env-check       # Vérifie les variables d'environnement\n"
 
 version:
 	@echo "$(VERSION)"
@@ -46,6 +54,18 @@ info:
 	@printf "Project : $(PROJECT)\n"
 	@printf "Env     : $(ENV)\n"
 	@printf "Image   : $(FULL_IMAGE):$(VERSION)\n"
+
+env-check:
+	@echo "Checking environment variables..."
+	@echo "NGINX_HTTP_PORT: ${NGINX_HTTP_PORT:-80}"
+	@echo "GRAFANA_PORT: ${GRAFANA_PORT:-3000}"
+	@echo "GF_SECURITY_ADMIN_PASSWORD: $${GF_SECURITY_ADMIN_PASSWORD:-not set}"
+	@if [ -f .env ]; then \
+	  echo "\n.env file exists. Contents:"; \
+	  grep -v "^#" .env | grep -v "^$$" || echo "  (empty or only comments)"; \
+	else \
+	  echo "\nWARNING: .env file not found!"; \
+	fi
 
 # ------------------------------------------------------------------
 # Quality/Lint (Docker/Shell/NGINX)
@@ -95,14 +115,31 @@ lint-nginx:
 # ------------------------------------------------------------------
 .PHONY: docker-build
 docker-build:
-	@echo "Building $(FULL_IMAGE):$(VERSION)..."
-	$(DOCKER) build -t "$(FULL_IMAGE):$(VERSION)" --platform $(PLATFORM) --label "org.opencontainers.image.version=$(VERSION)" .
-	$(DOCKER) tag "$(FULL_IMAGE):$(VERSION)" "$(FULL_IMAGE):latest"
+	@echo "Pulling monitoring stack images..."
+	$(COMPOSE) --profile monitoring pull
+	@echo "Building all containers..."
+	$(COMPOSE) build
+	@echo "Tagging NGINX image as $(FULL_IMAGE):$(VERSION)..."
+	@NGINX_IMAGE=$$($(DOCKER) images --format "{{.Repository}}:{{.Tag}}" | grep -E "^beacon_nginx|^$(PROJECT)_nginx" | head -1); \
+	if [ -z "$$NGINX_IMAGE" ]; then \
+	  NGINX_IMAGE="beacon_nginx:latest"; \
+	fi; \
+	if $(DOCKER) images -q "$$NGINX_IMAGE" >/dev/null 2>&1; then \
+	  $(DOCKER) tag "$$NGINX_IMAGE" "$(FULL_IMAGE):$(VERSION)"; \
+	  $(DOCKER) tag "$(FULL_IMAGE):$(VERSION)" "$(FULL_IMAGE):latest"; \
+	  echo "Tagged $$NGINX_IMAGE as $(FULL_IMAGE):$(VERSION)"; \
+	else \
+	  echo "Error: NGINX image '$$NGINX_IMAGE' not found."; \
+	  echo "Available images:"; \
+	  $(DOCKER) images --format "table {{.Repository}}\t{{.Tag}}" | grep -E "(nginx|beacon|$(PROJECT))" || echo "  (none found)"; \
+	fi
 
 # ------------------------------------------------------------------
 # Docker Compose lifecycle
 # ------------------------------------------------------------------
-.PHONY: up down restart logs ps
+.PHONY: up down restart logs ps \
+	up-monitoring down-monitoring up-monitoring-only down-monitoring-only \
+	monitoring-logs monitoring-status
 up:
 	$(COMPOSE) up -d
 
@@ -117,6 +154,31 @@ logs:
 
 ps:
 	$(COMPOSE) ps
+
+up-monitoring:
+	$(COMPOSE) --profile monitoring up -d
+
+down-monitoring:
+	$(COMPOSE) --profile monitoring down
+
+up-monitoring-only:
+	$(COMPOSE) --profile monitoring up -d grafana prometheus loki tempo promtail cadvisor node-exporter
+
+down-monitoring-only:
+	$(COMPOSE) --profile monitoring down grafana prometheus loki tempo promtail cadvisor node-exporter
+
+monitoring-logs:
+	$(COMPOSE) logs -f grafana prometheus loki tempo promtail cadvisor node-exporter
+
+monitoring-status:
+	$(COMPOSE) ps grafana prometheus loki tempo promtail cadvisor node-exporter
+
+reset-grafana:
+	@echo "Resetting Grafana (this will delete all Grafana data)..."
+	$(COMPOSE) --profile monitoring stop grafana || true
+	$(COMPOSE) --profile monitoring rm -f grafana || true
+	$(DOCKER) volume rm beacon_grafana-data 2>/dev/null || echo "Volume already removed or doesn't exist"
+	@echo "Grafana reset complete. Restart with: make up-monitoring"
 
 # ------------------------------------------------------------------
 # CI pipeline

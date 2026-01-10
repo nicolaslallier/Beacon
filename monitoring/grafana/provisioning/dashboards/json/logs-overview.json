@@ -1,0 +1,39 @@
+{
+  "title": "Logs Overview",
+  "panels": [
+    {
+      "title": "Log Volume",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"varlogs\"}[5m])) by (container)",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Error Logs",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "count_over_time({level=\"error\"}[1h]) by (container)",
+          "legendFormat": "{{container}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Top Error Messages",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "topk(5, count_over_time({level=\"error\"}[1h]) by (msg))",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 34,
+  "version": 1
+}

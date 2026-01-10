@@ -1,0 +1,65 @@
+groups:
+  - name: baseline-alerts
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Instance {{ $labels.instance }} down'
+          description: '{{ $labels.job }} is down for more than 1 minute.'
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High error rate for {{ $labels.job }}'
+          description: 'More than 5% HTTP 5xx responses in last 5m.'
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High p95 latency for {{ $labels.job }}'
+          description: 'p95 latency above 500ms.'
+
+      - alert: HighCPU
+        expr: max(rate(container_cpu_usage_seconds_total{name!=""}[5m])) by (name) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High CPU usage {{ $labels.name }}'
+          description: 'CPU > 85% over 5m.'
+
+      - alert: HighMemory
+        expr: max(container_memory_working_set_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) by (name) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High Memory usage {{ $labels.name }}'
+          description: 'Memory > 90% of limit over 5m.'
+
+      - alert: ContainerRestartLoop
+        expr: changes(container_start_time_seconds{name!=""}[15m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Container restart loop detected {{ $labels.name }}'
+          description: 'Container {{ $labels.name }} has restarted more than 2 times in the last 15 minutes.'
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Disk usage high on {{ $labels.instance }}'
+          description: 'More than 85% disk used.'

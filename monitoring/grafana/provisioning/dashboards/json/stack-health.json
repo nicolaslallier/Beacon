@@ -1,0 +1,48 @@
+{
+  "title": "Stack Health",
+  "panels": [
+    {
+      "title": "Prometheus Targets Up",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(up)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Loki Ingestion Rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(loki_ingester_received_chunks_total[1m]))",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Tempo Spans Ingested",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(instrumentation_library_spans_created)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Disk Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "1 - (node_filesystem_free_bytes / node_filesystem_size_bytes)",
+          "legendFormat": "{{instance}}",
+          "refId": "D"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 34,
+  "version": 1
+}
