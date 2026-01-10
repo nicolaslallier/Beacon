@@ -14,16 +14,30 @@ http {
     include       mime.types;
     default_type  application/octet-stream;
 
-    access_log /dev/stdout '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent $request_time "$http_referer" "$http_user_agent" "$http_x_forwarded_for" $upstream_addr $upstream_response_time';
+    # Docker DNS resolver for dynamic upstream resolution
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent $request_time "$http_referer" "$http_user_agent" "$http_x_forwarded_for" $upstream_addr $upstream_response_time';
+    access_log /dev/stdout main;
 
     # Compression
     gzip ${GZIP_ENABLED};
-    gzip_types application/json application/javascript text/css text/html text/plain;
+    gzip_types application/json application/javascript text/css text/plain;
 
     # Set maximum client body size
     client_max_body_size ${MAX_BODY_SIZE};
 
     server_tokens off;
+
+    # Map for API upstream
+    map "" ${DOLLAR}api_upstream {
+        default http://${UPSTREAM_API_HOST}:${UPSTREAM_API_PORT};
+    }
+
+    # Map for Web upstream
+    map "" ${DOLLAR}web_upstream {
+        default http://${UPSTREAM_WEB_HOST}:${UPSTREAM_WEB_PORT};
+    }
 
     # SERVER
     server {
@@ -53,16 +67,16 @@ http {
             internal;
         }
 
-        # API route
+        # API route - using variable for runtime DNS resolution
         location /api/ {
             include /etc/nginx/conf.d/proxy_headers.conf;
-            proxy_pass http://${UPSTREAM_API_HOST}:${UPSTREAM_API_PORT};
+            proxy_pass ${DOLLAR}api_upstream;
         }
 
-        # Frontend/static
+        # Frontend/static - using variable for runtime DNS resolution
         location / {
             include /etc/nginx/conf.d/proxy_headers.conf;
-            proxy_pass http://${UPSTREAM_WEB_HOST}:${UPSTREAM_WEB_PORT};
+            proxy_pass ${DOLLAR}web_upstream;
             # Uncomment for static:
             # root /usr/share/nginx/html;
             # try_files $uri $uri/ =404;
