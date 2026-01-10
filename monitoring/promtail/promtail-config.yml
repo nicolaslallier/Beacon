@@ -31,5 +31,14 @@ scrape_configs:
         target_label: compose_service
       - source_labels: ['__meta_docker_container_label_com_docker_swarm_service_name']
         target_label: swarm_service
+      # MinIO-specific labels
+      - source_labels: [__meta_docker_container_name]
+        regex: beacon-minio(\d+)
+        target_label: node
+        replacement: minio${1}
+      - source_labels: [__meta_docker_container_name]
+        regex: beacon-minio.*
+        target_label: service
+        replacement: minio
     pipeline_stages:
       - docker: {}

@@ -57,6 +57,10 @@ Create a `.env` file or export desired values before running. All configurable v
 | UPSTREAM_API_PORT    | 8080       | Port for API backend             |
 | UPSTREAM_GRAFANA_HOST| grafana    | Host for Grafana container       |
 | UPSTREAM_GRAFANA_PORT| 3000       | Port for Grafana                 |
+| UPSTREAM_MINIO_CONSOLE_HOST| minio1     | Host for MinIO Console           |
+| UPSTREAM_MINIO_CONSOLE_PORT| 9001       | Port for MinIO Console            |
+| UPSTREAM_MINIO_S3_HOST| minio1     | Host for MinIO S3 API             |
+| UPSTREAM_MINIO_S3_PORT| 9000       | Port for MinIO S3 API             |
 | MAX_BODY_SIZE        | 50m        | Max upload size (e.g. file)      |
 | GZIP_ENABLED         | on         | Enable Gzip compression (on/off) |
 
@@ -65,6 +69,15 @@ Create a `.env` file or export desired values before running. All configurable v
 | Variable                      | Default    | Description                              |
 |-------------------------------|------------|------------------------------------------|
 | GF_SECURITY_ADMIN_PASSWORD    | (required) | Grafana admin password (set in `.env`)   |
+
+### MinIO Variables
+
+| Variable                      | Default    | Description                              |
+|-------------------------------|------------|------------------------------------------|
+| MINIO_ROOT_USER               | minioadmin | MinIO root user (admin access)           |
+| MINIO_ROOT_PASSWORD           | minioadmin | MinIO root password (change in prod!)    |
+
+**Important**: Change `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` in your `.env` file before starting MinIO in production. Never commit passwords to version control.
 
 **Note**: Grafana is accessed via NGINX proxy at `grafana.beacon.famillelallier.net`. The direct port mapping has been removed for security.
 

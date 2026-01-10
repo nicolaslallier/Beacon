@@ -63,3 +63,50 @@ groups:
         annotations:
           summary: 'Disk usage high on {{ $labels.instance }}'
           description: 'More than 85% disk used.'
+
+  - name: minio-alerts
+    rules:
+      - alert: MinioNodeDown
+        expr: up{job="minio"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'MinIO node {{ $labels.instance }} is down'
+          description: 'MinIO node {{ $labels.instance }} has been down for more than 2 minutes.'
+
+      - alert: MinioHighErrorRate
+        expr: sum(rate(minio_s3_requests_total{status_code=~"5.."}[5m])) by (instance) / sum(rate(minio_s3_requests_total[5m])) by (instance) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High 5xx error rate on MinIO node {{ $labels.instance }}'
+          description: 'More than 1% of requests are returning 5xx errors on {{ $labels.instance }}.'
+
+      - alert: MinioHighLatency
+        expr: histogram_quantile(0.95, sum(rate(minio_s3_request_duration_seconds_bucket[5m])) by (le, instance)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High p95 latency on MinIO node {{ $labels.instance }}'
+          description: 'p95 latency above 500ms on {{ $labels.instance }} for more than 5 minutes.'
+
+      - alert: MinioDiskUsageHigh
+        expr: (minio_disk_used_bytes / minio_disk_total_bytes) > 0.80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High disk usage on MinIO node {{ $labels.instance }}'
+          description: 'Disk usage above 80% on {{ $labels.instance }}.'
+
+      - alert: MinioLowFreeSpace
+        expr: (minio_disk_total_bytes - minio_disk_used_bytes) < 10737418240
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Low free space on MinIO node {{ $labels.instance }}'
+          description: 'Free space below 10GB on {{ $labels.instance }}.'

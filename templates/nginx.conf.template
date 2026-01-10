@@ -44,6 +44,144 @@ http {
         default http://${UPSTREAM_GRAFANA_HOST}:${UPSTREAM_GRAFANA_PORT};
     }
 
+    # Map for Prometheus upstream
+    map "" ${DOLLAR}prometheus_upstream {
+        default http://${UPSTREAM_PROMETHEUS_HOST}:${UPSTREAM_PROMETHEUS_PORT};
+    }
+
+    # Map for Loki upstream
+    map "" ${DOLLAR}loki_upstream {
+        default http://${UPSTREAM_LOKI_HOST}:${UPSTREAM_LOKI_PORT};
+    }
+
+    # Map for Tempo upstream
+    map "" ${DOLLAR}tempo_upstream {
+        default http://${UPSTREAM_TEMPO_HOST}:${UPSTREAM_TEMPO_PORT};
+    }
+
+    # Map for MinIO Console upstream
+    map "" ${DOLLAR}minio_console_upstream {
+        default http://${UPSTREAM_MINIO_CONSOLE_HOST}:${UPSTREAM_MINIO_CONSOLE_PORT};
+    }
+
+    # Map for MinIO S3 API upstream
+    map "" ${DOLLAR}minio_s3_upstream {
+        default http://${UPSTREAM_MINIO_S3_HOST}:${UPSTREAM_MINIO_S3_PORT};
+    }
+
+    # Map for Beacon Library upstream
+    map "" ${DOLLAR}beacon_library_upstream {
+        default http://${UPSTREAM_BEACON_LIBRARY_HOST}:${UPSTREAM_BEACON_LIBRARY_PORT};
+    }
+
+    # Map for WebSocket connection upgrade
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    # Beacon Library server block
+    server {
+        listen 80;
+        server_name beacon-library.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Beacon Library proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}beacon_library_upstream;
+            
+            # Beacon Library-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # MinIO Console server block
+    server {
+        listen 80;
+        server_name minio.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # MinIO Console proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}minio_console_upstream;
+            
+            # MinIO Console-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+            
+            # WebSocket support for MinIO Console
+            # Override Connection header from proxy_headers.conf for WebSocket upgrades
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # MinIO S3 API server block
+    server {
+        listen 80;
+        server_name s3.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # MinIO S3 API proxy - using variable for runtime DNS resolution
+        # MinIO handles load balancing internally in distributed mode
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}minio_s3_upstream;
+            
+            # S3 API-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+            
+            # Preserve original host header for S3 signature validation
+            proxy_set_header Host $host;
+        }
+    }
+
     # Grafana server block
     server {
         listen 80;
@@ -72,6 +210,99 @@ http {
             proxy_buffering off;
             
             # Additional proxy settings for Grafana
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # Prometheus server block
+    server {
+        listen 80;
+        server_name prometheus.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Prometheus proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}prometheus_upstream;
+            
+            # Prometheus-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # Loki server block
+    server {
+        listen 80;
+        server_name loki.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Loki proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}loki_upstream;
+            
+            # Loki-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # Tempo server block
+    server {
+        listen 80;
+        server_name tempo.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Tempo proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}tempo_upstream;
+            
+            # Tempo-specific proxy settings
+            proxy_buffering off;
             proxy_redirect off;
             proxy_read_timeout 300s;
             proxy_connect_timeout 75s;
