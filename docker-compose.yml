@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  nginx:
+    build: .
+    container_name: beacon-nginx
+    restart: unless-stopped
+    networks:
+      - nginx_net
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    environment:
+      - UPSTREAM_WEB_HOST=${UPSTREAM_WEB_HOST:-web}
+      - UPSTREAM_WEB_PORT=${UPSTREAM_WEB_PORT:-3000}
+      - UPSTREAM_API_HOST=${UPSTREAM_API_HOST:-api}
+      - UPSTREAM_API_PORT=${UPSTREAM_API_PORT:-8080}
+      - MAX_BODY_SIZE=${MAX_BODY_SIZE:-50m}
+      - GZIP_ENABLED=${GZIP_ENABLED:-on}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthz.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+networks:
+  nginx_net:
+    name: beacon_nginx_net

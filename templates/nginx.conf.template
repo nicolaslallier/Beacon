@@ -1,0 +1,71 @@
+user  nginx;
+worker_processes  auto;
+
+error_log  /dev/stderr warn;
+pid        /var/run/nginx.pid;
+
+# Main events block
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    access_log /dev/stdout '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent $request_time "$http_referer" "$http_user_agent" "$http_x_forwarded_for" $upstream_addr $upstream_response_time';
+
+    # Compression
+    gzip ${GZIP_ENABLED};
+    gzip_types application/json application/javascript text/css text/html text/plain;
+
+    # Set maximum client body size
+    client_max_body_size ${MAX_BODY_SIZE};
+
+    server_tokens off;
+
+    # SERVER
+    server {
+        listen 80;
+
+        # If SSL env is set use listen 443
+        # listen 443 ssl http2; # (uncomment for TLS)
+        # ssl_certificate /etc/nginx/certs/fullchain.pem;
+        # ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Block access to sensitive files
+        location ~* ^/(.git|.env) {
+            deny all;
+            return 404;
+        }
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # API route
+        location /api/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass http://${UPSTREAM_API_HOST}:${UPSTREAM_API_PORT};
+        }
+
+        # Frontend/static
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass http://${UPSTREAM_WEB_HOST}:${UPSTREAM_WEB_PORT};
+            # Uncomment for static:
+            # root /usr/share/nginx/html;
+            # try_files $uri $uri/ =404;
+        }
+    }
+}
