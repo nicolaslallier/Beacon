@@ -26,18 +26,26 @@ help:
 	@printf "  make lint-shell      # Lint des scripts shell (shellcheck)\n"
 	@printf "  make lint-nginx      # Test la conf NGINX\n"
 	@printf "\n## Docker Compose\n"
-	@printf "  make up              # Démarre les services\n"
-	@printf "  make up-monitoring   # Démarre les services avec monitoring\n"
+	@printf "  make up              # Démarre tous les services (nginx + monitoring + auth)\n"
+	@printf "  make up-core         # Démarre uniquement nginx\n"
+	@printf "  make up-monitoring   # Démarre nginx + monitoring\n"
+	@printf "  make up-auth         # Démarre nginx + auth (Keycloak)\n"
 	@printf "  make up-monitoring-only   # Seulement la stack monitoring\n"
-	@printf "  make down            # Stoppe les services\n"
+	@printf "  make up-auth-only    # Seulement Keycloak + DB\n"
+	@printf "  make down            # Stoppe tous les services\n"
 	@printf "  make down-monitoring # Arrête tout avec monitoring\n"
+	@printf "  make down-auth       # Arrête tout avec auth\n"
 	@printf "  make down-monitoring-only # Stoppe uniquement la stack monitoring\n"
+	@printf "  make down-auth-only  # Stoppe uniquement Keycloak + DB\n"
 	@printf "  make restart         # Redémarre les services\n"
 	@printf "  make logs            # Affiche les logs\n"
 	@printf "  make monitoring-logs    # Logs only monitoring services\n"
+	@printf "  make auth-logs       # Logs only auth services (Keycloak)\n"
 	@printf "  make ps              # Montre le statut des services\n"
 	@printf "  make monitoring-status # Statut health monitoring\n"
+	@printf "  make auth-status     # Statut health auth (Keycloak)\n"
 	@printf "  make reset-grafana   # Reset Grafana (delete data, use new password)\n"
+	@printf "  make reset-keycloak  # Reset Keycloak (delete data)\n"
 	@printf "\n## CI Pipeline\n"
 	@printf "  make ci              # Pipeline CI complet (lint + build)\n"
 	@printf "\n## Release/Deploy\n"
@@ -117,6 +125,8 @@ lint-nginx:
 docker-build:
 	@echo "Pulling monitoring stack images..."
 	$(COMPOSE) --profile monitoring pull
+	@echo "Pulling auth stack images..."
+	$(COMPOSE) --profile auth pull
 	@echo "Building all containers..."
 	$(COMPOSE) build
 	@echo "Tagging NGINX image as $(FULL_IMAGE):$(VERSION)..."
@@ -137,24 +147,33 @@ docker-build:
 # ------------------------------------------------------------------
 # Docker Compose lifecycle
 # ------------------------------------------------------------------
-.PHONY: up down restart logs ps \
+.PHONY: up up-core down restart logs ps \
 	up-monitoring down-monitoring up-monitoring-only down-monitoring-only \
-	monitoring-logs monitoring-status
+	up-auth down-auth up-auth-only down-auth-only \
+	monitoring-logs monitoring-status auth-logs auth-status \
+	reset-grafana reset-keycloak
+
+# Start all services (nginx + monitoring + auth)
 up:
+	$(COMPOSE) --profile monitoring --profile auth up -d
+
+# Start only core nginx service
+up-core:
 	$(COMPOSE) up -d
 
 down:
-	$(COMPOSE) down
+	$(COMPOSE) --profile monitoring --profile auth down
 
 restart:
-	$(COMPOSE) restart
+	$(COMPOSE) --profile monitoring --profile auth up -d --force-recreate
 
 logs:
-	$(COMPOSE) logs -f
+	$(COMPOSE) --profile monitoring --profile auth logs -f
 
 ps:
-	$(COMPOSE) ps
+	$(COMPOSE) --profile monitoring --profile auth ps
 
+# --- Monitoring targets ---
 up-monitoring:
 	$(COMPOSE) --profile monitoring up -d
 
@@ -162,16 +181,16 @@ down-monitoring:
 	$(COMPOSE) --profile monitoring down
 
 up-monitoring-only:
-	$(COMPOSE) --profile monitoring up -d grafana prometheus loki tempo promtail cadvisor node-exporter
+	$(COMPOSE) --profile monitoring up -d grafana prometheus loki tempo promtail cadvisor node-exporter minio1 minio2 minio3
 
 down-monitoring-only:
-	$(COMPOSE) --profile monitoring down grafana prometheus loki tempo promtail cadvisor node-exporter
+	$(COMPOSE) --profile monitoring stop grafana prometheus loki tempo promtail cadvisor node-exporter minio1 minio2 minio3
 
 monitoring-logs:
-	$(COMPOSE) logs -f grafana prometheus loki tempo promtail cadvisor node-exporter
+	$(COMPOSE) logs -f grafana prometheus loki tempo promtail cadvisor node-exporter minio1 minio2 minio3
 
 monitoring-status:
-	$(COMPOSE) ps grafana prometheus loki tempo promtail cadvisor node-exporter
+	$(COMPOSE) ps grafana prometheus loki tempo promtail cadvisor node-exporter minio1 minio2 minio3
 
 reset-grafana:
 	@echo "Resetting Grafana (this will delete all Grafana data)..."
@@ -179,6 +198,32 @@ reset-grafana:
 	$(COMPOSE) --profile monitoring rm -f grafana || true
 	$(DOCKER) volume rm beacon_grafana-data 2>/dev/null || echo "Volume already removed or doesn't exist"
 	@echo "Grafana reset complete. Restart with: make up-monitoring"
+
+# --- Auth (Keycloak) targets ---
+up-auth:
+	$(COMPOSE) --profile auth up -d
+
+down-auth:
+	$(COMPOSE) --profile auth down
+
+up-auth-only:
+	$(COMPOSE) --profile auth up -d keycloak keycloak-db
+
+down-auth-only:
+	$(COMPOSE) --profile auth stop keycloak keycloak-db
+
+auth-logs:
+	$(COMPOSE) logs -f keycloak keycloak-db
+
+auth-status:
+	$(COMPOSE) ps keycloak keycloak-db
+
+reset-keycloak:
+	@echo "Resetting Keycloak (this will delete all Keycloak data)..."
+	$(COMPOSE) --profile auth stop keycloak keycloak-db || true
+	$(COMPOSE) --profile auth rm -f keycloak keycloak-db || true
+	$(DOCKER) volume rm beacon_keycloak-db-data 2>/dev/null || echo "Volume already removed or doesn't exist"
+	@echo "Keycloak reset complete. Restart with: make up-auth"
 
 # ------------------------------------------------------------------
 # CI pipeline

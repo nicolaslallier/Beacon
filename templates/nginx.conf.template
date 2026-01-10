@@ -27,6 +27,10 @@ http {
     # Set maximum client body size
     client_max_body_size ${MAX_BODY_SIZE};
 
+    # Increase hash sizes for proxy headers (needed with many upstreams)
+    proxy_headers_hash_max_size 1024;
+    proxy_headers_hash_bucket_size 128;
+
     server_tokens off;
 
     # Map for API upstream
@@ -72,6 +76,11 @@ http {
     # Map for Beacon Library upstream
     map "" ${DOLLAR}beacon_library_upstream {
         default http://${UPSTREAM_BEACON_LIBRARY_HOST}:${UPSTREAM_BEACON_LIBRARY_PORT};
+    }
+
+    # Map for Keycloak upstream
+    map "" ${DOLLAR}keycloak_upstream {
+        default http://${UPSTREAM_KEYCLOAK_HOST}:${UPSTREAM_KEYCLOAK_PORT};
     }
 
     # Map for WebSocket connection upgrade
@@ -306,6 +315,46 @@ http {
             proxy_redirect off;
             proxy_read_timeout 300s;
             proxy_connect_timeout 75s;
+        }
+    }
+
+    # Keycloak server block
+    server {
+        listen 80;
+        server_name keycloak.beacon.famillelallier.net;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Keycloak proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}keycloak_upstream;
+            
+            # Keycloak-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+            
+            # Required headers for Keycloak behind reverse proxy
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            # Large buffer sizes for Keycloak (SAML/OIDC tokens can be large)
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
         }
     }
 

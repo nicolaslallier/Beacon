@@ -31,6 +31,8 @@ services:
       - UPSTREAM_MINIO_S3_PORT=${UPSTREAM_MINIO_S3_PORT:-9000}
       - UPSTREAM_BEACON_LIBRARY_HOST=${UPSTREAM_BEACON_LIBRARY_HOST:-beacon-library-nginx}
       - UPSTREAM_BEACON_LIBRARY_PORT=${UPSTREAM_BEACON_LIBRARY_PORT:-80}
+      - UPSTREAM_KEYCLOAK_HOST=${UPSTREAM_KEYCLOAK_HOST:-keycloak}
+      - UPSTREAM_KEYCLOAK_PORT=${UPSTREAM_KEYCLOAK_PORT:-8080}
       - MAX_BODY_SIZE=${MAX_BODY_SIZE:-50m}
       - GZIP_ENABLED=${GZIP_ENABLED:-on}
     healthcheck:
@@ -249,6 +251,67 @@ services:
       retries: 3
       start_period: 30s
 
+  # ============================================
+  # Keycloak Identity & Access Management
+  # ============================================
+  keycloak-db:
+    image: postgres:16-alpine
+    profiles: [auth]
+    container_name: beacon-keycloak-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${KEYCLOAK_DB_NAME:-keycloak}
+      - POSTGRES_USER=${KEYCLOAK_DB_USER:-keycloak}
+      - POSTGRES_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
+    volumes:
+      - beacon_keycloak-db-data:/var/lib/postgresql/data
+    networks:
+      - keycloak_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB_NAME:-keycloak}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    profiles: [auth]
+    container_name: beacon-keycloak
+    restart: unless-stopped
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    command: start
+    environment:
+      # Database configuration
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
+      - KC_DB_USERNAME=${KEYCLOAK_DB_USER:-keycloak}
+      - KC_DB_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
+      # Admin credentials
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Proxy configuration (behind NGINX)
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_ENABLED=true
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME=${KEYCLOAK_HOSTNAME:-keycloak.beacon.famillelallier.net}
+      # Health and metrics
+      - KC_HEALTH_ENABLED=true
+      - KC_METRICS_ENABLED=true
+      # Logging
+      - KC_LOG_LEVEL=${KEYCLOAK_LOG_LEVEL:-info}
+    networks:
+      - keycloak_net
+      - nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 volumes:
   beacon_grafana-data:
   beacon_prometheus-data:
@@ -257,12 +320,15 @@ volumes:
   beacon_minio1-data:
   beacon_minio2-data:
   beacon_minio3-data:
+  beacon_keycloak-db-data:
 
 networks:
   nginx_net:
     name: beacon_nginx_net
   monitoring_net:
     name: beacon_monitoring_net
+  keycloak_net:
+    name: beacon_keycloak_net
   beacon_library_net:
     external: true
     name: beacon-library_beacon-network
