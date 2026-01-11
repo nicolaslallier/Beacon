@@ -89,10 +89,42 @@ http {
         ''      close;
     }
 
-    # Beacon Library server block
+    # ===========================================
+    # HTTP to HTTPS redirect (when SSL enabled)
+    # ===========================================
     server {
-        listen 80;
+        listen 80 default_server;
+        server_name _;
+
+        # Health endpoint (always available on HTTP)
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # ACME challenge for Let's Encrypt
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        # Redirect all other HTTP traffic to HTTPS
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # ===========================================
+    # Beacon Library HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
         server_name beacon-library.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -109,21 +141,45 @@ http {
 
         # Beacon Library proxy - using variable for runtime DNS resolution
         location / {
-            include /etc/nginx/conf.d/proxy_headers.conf;
+            # Standard proxy headers (NOT including proxy_headers.conf to avoid Connection override)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
             proxy_pass ${DOLLAR}beacon_library_upstream;
             
             # Beacon Library-specific proxy settings
             proxy_buffering off;
             proxy_redirect off;
-            proxy_read_timeout 300s;
+            proxy_cache_bypass $http_upgrade;
+            
+            # Extended timeouts for WebSocket connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
             proxy_connect_timeout 75s;
+            
+            # WebSocket support for Vite HMR (MUST come after other proxy_set_header directives)
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
         }
     }
 
-    # MinIO Console server block
+    # ===========================================
+    # MinIO Console HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name minio.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -150,16 +206,23 @@ http {
             proxy_connect_timeout 75s;
             
             # WebSocket support for MinIO Console
-            # Override Connection header from proxy_headers.conf for WebSocket upgrades
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
         }
     }
 
-    # MinIO S3 API server block
+    # ===========================================
+    # MinIO S3 API HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name s3.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -175,7 +238,6 @@ http {
         }
 
         # MinIO S3 API proxy - using variable for runtime DNS resolution
-        # MinIO handles load balancing internally in distributed mode
         location / {
             include /etc/nginx/conf.d/proxy_headers.conf;
             proxy_pass ${DOLLAR}minio_s3_upstream;
@@ -191,10 +253,18 @@ http {
         }
     }
 
-    # Grafana server block
+    # ===========================================
+    # Grafana HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name grafana.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -217,18 +287,24 @@ http {
             # Grafana-specific proxy settings
             proxy_set_header X-WEBAUTH-USER $remote_user;
             proxy_buffering off;
-            
-            # Additional proxy settings for Grafana
             proxy_redirect off;
             proxy_read_timeout 300s;
             proxy_connect_timeout 75s;
         }
     }
 
-    # Prometheus server block
+    # ===========================================
+    # Prometheus HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name prometheus.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -256,10 +332,18 @@ http {
         }
     }
 
-    # Loki server block
+    # ===========================================
+    # Loki HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name loki.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -287,10 +371,18 @@ http {
         }
     }
 
-    # Tempo server block
+    # ===========================================
+    # Tempo HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name tempo.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -318,10 +410,18 @@ http {
         }
     }
 
-    # Keycloak server block
+    # ===========================================
+    # Keycloak HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
         server_name keycloak.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Error page
         error_page 502 504 /502.html;
@@ -348,8 +448,8 @@ http {
             proxy_connect_timeout 75s;
             
             # Required headers for Keycloak behind reverse proxy
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port 443;
             
             # Large buffer sizes for Keycloak (SAML/OIDC tokens can be large)
             proxy_buffer_size 128k;
@@ -358,14 +458,18 @@ http {
         }
     }
 
-    # SERVER
+    # ===========================================
+    # Default HTTPS server block
+    # ===========================================
     server {
-        listen 80;
+        listen 443 ssl;
+        http2 on;
+        server_name _;
 
-        # If SSL env is set use listen 443
-        # listen 443 ssl http2; # (uncomment for TLS)
-        # ssl_certificate /etc/nginx/certs/fullchain.pem;
-        # ssl_certificate_key /etc/nginx/certs/privkey.pem;
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
 
         # Health endpoint
         location = /healthz {
@@ -396,9 +500,6 @@ http {
         location / {
             include /etc/nginx/conf.d/proxy_headers.conf;
             proxy_pass ${DOLLAR}web_upstream;
-            # Uncomment for static:
-            # root /usr/share/nginx/html;
-            # try_files $uri $uri/ =404;
         }
     }
 }

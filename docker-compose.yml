@@ -8,10 +8,15 @@ services:
       - nginx_net
       - monitoring_net
       - beacon_library_net
+      - keycloak_net
     env_file:
       - .env
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${SSL_CERTS_PATH:-./certs}:/etc/nginx/certs:ro
+      - ${CERTBOT_WWW_PATH:-./certbot/www}:/var/www/certbot:ro
     environment:
       - UPSTREAM_WEB_HOST=${UPSTREAM_WEB_HOST:-web}
       - UPSTREAM_WEB_PORT=${UPSTREAM_WEB_PORT:-3000}
@@ -35,6 +40,9 @@ services:
       - UPSTREAM_KEYCLOAK_PORT=${UPSTREAM_KEYCLOAK_PORT:-8080}
       - MAX_BODY_SIZE=${MAX_BODY_SIZE:-50m}
       - GZIP_ENABLED=${GZIP_ENABLED:-on}
+      # SSL Configuration
+      - SSL_CERT_PATH=${SSL_CERT_PATH:-/etc/nginx/certs/fullchain.pem}
+      - SSL_KEY_PATH=${SSL_KEY_PATH:-/etc/nginx/certs/privkey.pem}
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthz.sh"]
       interval: 30s
@@ -198,6 +206,7 @@ services:
     networks:
       - monitoring_net
       - nginx_net
+      - minio_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -221,6 +230,7 @@ services:
     networks:
       - monitoring_net
       - nginx_net
+      - minio_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -244,6 +254,7 @@ services:
     networks:
       - monitoring_net
       - nginx_net
+      - minio_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -292,11 +303,17 @@ services:
       # Admin credentials
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      # Proxy configuration (behind NGINX)
+      # Proxy configuration (behind NGINX reverse proxy with SSL termination)
+      - KC_PROXY=edge
       - KC_PROXY_HEADERS=xforwarded
       - KC_HTTP_ENABLED=true
-      - KC_HOSTNAME_STRICT=false
+      # Hostname configuration - tell Keycloak it's accessible via HTTPS
       - KC_HOSTNAME=${KEYCLOAK_HOSTNAME:-keycloak.beacon.famillelallier.net}
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_STRICT_HTTPS=false
+      # Frontend URL (this is what users will access)
+      - KC_HOSTNAME_URL=https://${KEYCLOAK_HOSTNAME:-keycloak.beacon.famillelallier.net}
+      - KC_HOSTNAME_ADMIN_URL=https://${KEYCLOAK_HOSTNAME:-keycloak.beacon.famillelallier.net}
       # Health and metrics
       - KC_HEALTH_ENABLED=true
       - KC_METRICS_ENABLED=true
@@ -329,6 +346,9 @@ networks:
     name: beacon_monitoring_net
   keycloak_net:
     name: beacon_keycloak_net
+  minio_net:
+    external: true
+    name: beacon_minio_net
   beacon_library_net:
     external: true
     name: beacon-library_beacon-network
