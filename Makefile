@@ -46,6 +46,12 @@ help:
 	@printf "  make auth-status     # Statut health auth (Keycloak)\n"
 	@printf "  make reset-grafana   # Reset Grafana (delete data, use new password)\n"
 	@printf "  make reset-keycloak  # Reset Keycloak (delete data)\n"
+	@printf "\n## SSL / Private CA\n"
+	@printf "  make ssl-init        # Create private CA and certificates\n"
+	@printf "  make ssl-renew       # Renew server certificate\n"
+	@printf "  make ssl-status      # Show certificate info and expiry\n"
+	@printf "  make ssl-install-ca-macos # Install CA on macOS\n"
+	@printf "  make ssl-show-ca-path # Show path for NODE_EXTRA_CA_CERTS\n"
 	@printf "\n## CI Pipeline\n"
 	@printf "  make ci              # Pipeline CI complet (lint + build)\n"
 	@printf "\n## Release/Deploy\n"
@@ -224,6 +230,46 @@ reset-keycloak:
 	$(COMPOSE) --profile auth rm -f keycloak keycloak-db || true
 	$(DOCKER) volume rm beacon_keycloak-db-data 2>/dev/null || echo "Volume already removed or doesn't exist"
 	@echo "Keycloak reset complete. Restart with: make up-auth"
+
+# --- SSL / Private CA targets ---
+ssl-init:
+	@echo "Setting up Private CA and certificates..."
+	@./scripts/setup-private-ca.sh
+
+ssl-renew:
+	@echo "Renewing server certificate..."
+	@./scripts/renew-private-cert.sh
+
+ssl-status:
+	@echo "=== Certificate Status ==="
+	@if [ -f certs/fullchain.pem ]; then \
+		echo "Server Certificate:"; \
+		openssl x509 -in certs/fullchain.pem -noout -subject -dates 2>/dev/null || echo "Could not read certificate"; \
+		echo ""; \
+		echo "Subject Alternative Names:"; \
+		openssl x509 -in certs/fullchain.pem -noout -text 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 || true; \
+	else \
+		echo "No certificate found at certs/fullchain.pem"; \
+		echo "Run 'make ssl-init' to create certificates"; \
+	fi
+	@echo ""
+	@if [ -f ca/beacon-ca.crt ]; then \
+		echo "CA Certificate:"; \
+		openssl x509 -in ca/beacon-ca.crt -noout -subject -dates 2>/dev/null || echo "Could not read CA certificate"; \
+	fi
+
+ssl-install-ca-macos:
+	@echo "Installing CA certificate on macOS..."
+	@if [ -f ca/beacon-ca.crt ]; then \
+		sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca/beacon-ca.crt; \
+		echo "✅ CA installed. You may need to restart browsers."; \
+	else \
+		echo "❌ CA not found. Run 'make ssl-init' first."; \
+	fi
+
+ssl-show-ca-path:
+	@echo "CA certificate path for NODE_EXTRA_CA_CERTS:"
+	@echo "export NODE_EXTRA_CA_CERTS=$(PWD)/ca/beacon-ca.crt"
 
 # ------------------------------------------------------------------
 # CI pipeline

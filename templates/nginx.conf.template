@@ -78,6 +78,17 @@ http {
         default http://${UPSTREAM_BEACON_LIBRARY_HOST}:${UPSTREAM_BEACON_LIBRARY_PORT};
     }
 
+    # Map for ChromaDB Admin upstream (Beacon Library network)
+    map "" ${DOLLAR}chromadb_admin_upstream {
+        default http://${UPSTREAM_CHROMADB_ADMIN_HOST}:${UPSTREAM_CHROMADB_ADMIN_PORT};
+    }
+
+    # Map for ChromaDB upstream (Beacon Library network)
+    map "" ${DOLLAR}chromadb_upstream {
+        default http://${UPSTREAM_CHROMADB_HOST}:${UPSTREAM_CHROMADB_PORT};
+    }
+
+
     # Map for Keycloak upstream
     map "" ${DOLLAR}keycloak_upstream {
         default http://${UPSTREAM_KEYCLOAK_HOST}:${UPSTREAM_KEYCLOAK_PORT};
@@ -139,6 +150,31 @@ http {
             add_header Content-Type text/plain;
         }
 
+        # MCP SSE endpoint - must use HTTP/1.1 for Server-Sent Events
+        location /api/mcp/sse {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            proxy_pass ${DOLLAR}beacon_library_upstream;
+            
+            # Critical SSE settings
+            proxy_http_version 1.1;
+            proxy_set_header Connection '';
+            proxy_buffering off;
+            proxy_cache off;
+            
+            # Long timeout for SSE connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+            
+            # Chunked transfer encoding support
+            chunked_transfer_encoding on;
+        }
+
         # Beacon Library proxy - using variable for runtime DNS resolution
         location / {
             # Standard proxy headers (NOT including proxy_headers.conf to avoid Connection override)
@@ -165,6 +201,98 @@ http {
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # ChromaDB Admin HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name chromadbadmin.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # ChromaDB Admin proxy
+        location / {
+            # Standard proxy headers (NOT including proxy_headers.conf to avoid Connection override)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+
+            proxy_pass ${DOLLAR}chromadb_admin_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_cache_bypass $http_upgrade;
+
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support (safe even if unused)
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # ChromaDB HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name chromadb.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # ChromaDB proxy (HTTP API)
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}chromadb_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
         }
     }
 
@@ -406,6 +534,81 @@ http {
             proxy_buffering off;
             proxy_redirect off;
             proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # MCP Vector Server HTTPS server block
+    # Routes through Beacon-Library NGINX at /mcp-vector/
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name mcp-vector.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # MCP SSE endpoint - must use HTTP/1.1 for Server-Sent Events
+        location /mcp/sse {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            # Route through Beacon-Library NGINX
+            proxy_pass ${DOLLAR}beacon_library_upstream/mcp-vector/mcp/sse;
+            
+            # Critical SSE settings
+            proxy_http_version 1.1;
+            proxy_set_header Connection '';
+            proxy_buffering off;
+            proxy_cache off;
+            
+            # Long timeout for SSE connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+            
+            # Chunked transfer encoding support
+            chunked_transfer_encoding on;
+        }
+
+        # MCP Vector Server proxy - route through Beacon-Library NGINX
+        location / {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            # Rewrite and route through Beacon-Library NGINX
+            rewrite ^/(.*) /mcp-vector/$1 break;
+            proxy_pass ${DOLLAR}beacon_library_upstream;
+            
+            proxy_buffering off;
+            proxy_redirect off;
+            
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
             proxy_connect_timeout 75s;
         }
     }
