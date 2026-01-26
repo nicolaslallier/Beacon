@@ -1,0 +1,58 @@
+http:
+  routers:
+    beaconLibraryApi:
+      entryPoints:
+        - web
+      rule: PathPrefix(`/api`)
+      service: beaconLibraryApi
+      middlewares:
+        - rate-limit
+        - cors
+    oauth2Proxy:
+      entryPoints:
+        - web
+      rule: PathPrefix(`/oauth2/`)
+      service: oauth2Proxy
+
+  services:
+    beaconLibraryApi:
+      loadBalancer:
+        servers:
+          - url: http://beacon-library-backend:8000
+    oauth2Proxy:
+      loadBalancer:
+        servers:
+          - url: http://oauth2-proxy:4180
+
+  middlewares:
+    oauth2-auth:
+      forwardAuth:
+        address: http://oauth2-proxy:4180/oauth2/auth
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-Auth-Request-User
+          - X-Auth-Request-Email
+          - X-Auth-Request-Preferred-Username
+          - Authorization
+    rate-limit:
+      rateLimit:
+        average: 50
+        burst: 100
+    cors:
+      headers:
+        accessControlAllowOriginList:
+          - https://beacon-library.famillelallier.net
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - Authorization
+          - Content-Type
+          - X-Requested-With
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 300
+        addVaryHeader: true

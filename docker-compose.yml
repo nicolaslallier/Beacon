@@ -34,14 +34,18 @@ services:
       - UPSTREAM_MINIO_CONSOLE_PORT=${UPSTREAM_MINIO_CONSOLE_PORT:-9001}
       - UPSTREAM_MINIO_S3_HOST=${UPSTREAM_MINIO_S3_HOST:-minio1}
       - UPSTREAM_MINIO_S3_PORT=${UPSTREAM_MINIO_S3_PORT:-9000}
-      - UPSTREAM_BEACON_LIBRARY_HOST=${UPSTREAM_BEACON_LIBRARY_HOST:-beacon-library-nginx}
-      - UPSTREAM_BEACON_LIBRARY_PORT=${UPSTREAM_BEACON_LIBRARY_PORT:-80}
+      - UPSTREAM_BEACON_LIBRARY_HOST=${UPSTREAM_BEACON_LIBRARY_HOST:-beacon-library-frontend}
+      - UPSTREAM_BEACON_LIBRARY_PORT=${UPSTREAM_BEACON_LIBRARY_PORT:-3000}
+      - UPSTREAM_GATEWAY_HOST=${UPSTREAM_GATEWAY_HOST:-beacon-traefik}
+      - UPSTREAM_GATEWAY_PORT=${UPSTREAM_GATEWAY_PORT:-8080}
       - UPSTREAM_CHROMADB_ADMIN_HOST=${UPSTREAM_CHROMADB_ADMIN_HOST:-chromadb-admin}
       - UPSTREAM_CHROMADB_ADMIN_PORT=${UPSTREAM_CHROMADB_ADMIN_PORT:-3001}
       - UPSTREAM_CHROMADB_HOST=${UPSTREAM_CHROMADB_HOST:-chromadb}
       - UPSTREAM_CHROMADB_PORT=${UPSTREAM_CHROMADB_PORT:-8000}
       - UPSTREAM_KEYCLOAK_HOST=${UPSTREAM_KEYCLOAK_HOST:-keycloak}
       - UPSTREAM_KEYCLOAK_PORT=${UPSTREAM_KEYCLOAK_PORT:-8080}
+      - UPSTREAM_N8N_HOST=${UPSTREAM_N8N_HOST:-n8n}
+      - UPSTREAM_N8N_PORT=${UPSTREAM_N8N_PORT:-5678}
       - MAX_BODY_SIZE=${MAX_BODY_SIZE:-50m}
       - GZIP_ENABLED=${GZIP_ENABLED:-on}
       # SSL Configuration
@@ -53,6 +57,119 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  # ============================================
+  # API Gateway (Traefik + OAuth2 Proxy)
+  # ============================================
+  traefik:
+    image: traefik:v3.0.4
+    container_name: beacon-traefik
+    restart: unless-stopped
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    expose:
+      - "8080"
+      - "9100"
+    networks:
+      - nginx_net
+      - monitoring_net
+      - beacon_library_net
+    depends_on:
+      - oauth2-proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: beacon-oauth2-proxy
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - OAUTH2_PROXY_PROVIDER=${OAUTH2_PROXY_PROVIDER:-keycloak-oidc}
+      - OAUTH2_PROXY_OIDC_ISSUER_URL=${OAUTH2_PROXY_OIDC_ISSUER_URL}
+      - OAUTH2_PROXY_CLIENT_ID=${OAUTH2_PROXY_CLIENT_ID}
+      - OAUTH2_PROXY_CLIENT_SECRET=${OAUTH2_PROXY_CLIENT_SECRET}
+      - OAUTH2_PROXY_COOKIE_SECRET=${OAUTH2_PROXY_COOKIE_SECRET}
+      - OAUTH2_PROXY_REDIRECT_URL=${OAUTH2_PROXY_REDIRECT_URL}
+      - OAUTH2_PROXY_EMAIL_DOMAINS=${OAUTH2_PROXY_EMAIL_DOMAINS:-*}
+      - OAUTH2_PROXY_UPSTREAMS=static://200
+      - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
+      - OAUTH2_PROXY_PASS_ACCESS_TOKEN=true
+      - OAUTH2_PROXY_SET_AUTHORIZATION_HEADER=true
+      - OAUTH2_PROXY_SKIP_PROVIDER_BUTTON=true
+      - OAUTH2_PROXY_COOKIE_SECURE=${OAUTH2_PROXY_COOKIE_SECURE:-true}
+    expose:
+      - "4180"
+    networks:
+      - nginx_net
+      - keycloak_net
+
+  # ============================================
+  # n8n Automation
+  # ============================================
+  n8n:
+    image: n8nio/n8n:2.4.6
+    container_name: beacon-n8n
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - N8N_HOST=${N8N_HOST:-n8n.beacon.famillelallier.net}
+      - N8N_PORT=${N8N_PORT:-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://n8n.beacon.famillelallier.net/}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-https://n8n.beacon.famillelallier.net/}
+      - GENERIC_TIMEZONE=${N8N_TIMEZONE:-America/Montreal}
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-change_me}
+    expose:
+      - "5678"
+    volumes:
+      - beacon_n8n-data:/home/node/.n8n
+    networks:
+      - nginx_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:5678/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ============================================
+  # Technitium DNS Server (Ranger DNS GUI)
+  # ============================================
+  technitium-dns:
+    image: technitium/dns-server:13.6.0
+    container_name: beacon-technitium-dns
+    restart: unless-stopped
+    networks:
+      - nginx_net
+      - monitoring_net
+      - keycloak_net
+      - beacon_library_net
+    ports:
+      - "${TECHNITIUM_DNS_PORT:-8053}:53/udp"
+      - "${TECHNITIUM_DNS_PORT:-8053}:53/tcp"
+      - "${TECHNITIUM_WEB_PORT:-5380}:5380/tcp"
+    volumes:
+      - beacon_technitium-data:/etc/dns
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5380/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -95,11 +212,12 @@ services:
     restart: unless-stopped
     user: "65534:65534"
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-remote-write-receiver'  # Enable remote write from Alloy
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-remote-write-receiver" # Enable remote write from Alloy
+      - "--web.enable-lifecycle" # Allow config reload via /-/reload
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
@@ -108,6 +226,23 @@ services:
       - monitoring_net
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    profiles: [monitoring]
+    container_name: beacon-blackbox-exporter
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yml"
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks:
+      - monitoring_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9115/-/healthy"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -163,12 +298,12 @@ services:
     volumes:
       - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
       - /var/log:/var/log:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /Users/nicolaslallier/.docker/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - monitoring_net
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     profiles: [monitoring]
     container_name: beacon-cadvisor
     restart: unless-stopped
@@ -176,13 +311,17 @@ services:
       - "8080"
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:rw
+      - /Users/nicolaslallier/.docker/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+    environment:
+      - DOCKER_API_VERSION=1.52
     networks:
       - monitoring_net
     command:
-      - '--docker_only=true'
+      - "--docker_only=true"
+      - "--store_container_labels=false"
+      - "--whitelisted_container_labels=com.docker.compose.project,com.docker.compose.service,com.docker.compose.container-number"
 
   node-exporter:
     image: prom/node-exporter:v1.8.1
@@ -282,12 +421,28 @@ services:
       - beacon_keycloak-db-data:/var/lib/postgresql/data
     networks:
       - keycloak_net
+      - monitoring_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB_NAME:-keycloak}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB_NAME:-keycloak}",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    profiles: [monitoring]
+    container_name: beacon-postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${KEYCLOAK_DB_USER:-keycloak}:${KEYCLOAK_DB_PASSWORD:-keycloak}@keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}?sslmode=disable
+    networks:
+      - keycloak_net
+      - monitoring_net
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -326,12 +481,449 @@ services:
     networks:
       - keycloak_net
       - nginx_net
+      - monitoring_net
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # ============================================
+  # Beacon Library Stack
+  # ============================================
+  beacon-library-postgres:
+    image: postgres:16-alpine
+    profiles: [library]
+    container_name: beacon-library-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-beacon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-beacon_library}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - beacon_library_postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-beacon_user} -d ${POSTGRES_DB:-beacon_library}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beacon_library_net
+
+  beacon-library-redis:
+    image: redis:7-alpine
+    profiles: [library]
+    container_name: beacon-library-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - beacon_library_redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  beacon-library-backend:
+    build:
+      context: ./Library
+      dockerfile: backend/Dockerfile
+      target: ${BACKEND_TARGET:-dev}
+    profiles: [library]
+    container_name: beacon-library-backend
+    env_file:
+      - path: ./Library/.env
+        required: false
+    volumes:
+      - ./Library/backend:/app
+    environment:
+      ENV: ${ENV:-local}
+      # Database
+      POSTGRES_HOST: beacon-library-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-beacon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-beacon_library}
+      # Redis
+      REDIS_HOST: beacon-library-redis
+      REDIS_PORT: 6379
+      # MinIO - Connect to Beacon's MinIO cluster
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-beacon-minio1:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      # Keycloak - Connect to Beacon's Keycloak
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://beacon-keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-beacon}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-beacon-library}
+      ENABLE_AUTH: ${ENABLE_AUTH:-false} # Disable auth for development by default
+      # ChromaDB - Semantic search
+      CHROMADB_HOST: beacon-library-chromadb
+      CHROMADB_PORT: 8000
+      # Ollama - Embeddings
+      OLLAMA_HOST: beacon-library-ollama
+      OLLAMA_PORT: 11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # Gotenberg - Document conversion
+      GOTENBERG_URL: http://beacon-library-gotenberg:3000
+      # SMTP - Email notifications
+      SMTP_HOST: ${SMTP_HOST:-beacon-library-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@beacon.local}
+      # Observability
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://beacon-library-alloy:4317}
+      OTLP_ENABLED: ${OTLP_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command:
+      [
+        "poetry",
+        "run",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+      ]
+    depends_on:
+      beacon-library-postgres:
+        condition: service_healthy
+      beacon-library-redis:
+        condition: service_healthy
+      beacon-library-chromadb:
+        condition: service_healthy
+      beacon-library-gotenberg:
+        condition: service_healthy
+    expose:
+      - "8000"
+    # Expose MCP API directly for local agents (LM Studio, etc.)
+    # This allows agents to connect via HTTP without SSL certificate issues
+    ports:
+      - "${MCP_PORT:-8200}:8000"
+    networks:
+      - beacon_library_net
+      - keycloak_net
+      - minio_net
+    restart: unless-stopped
+
+  beacon-library-frontend:
+    build:
+      context: ./Library
+      dockerfile: frontend/Dockerfile
+      target: ${FRONTEND_TARGET:-dev}
+    profiles: [library]
+    container_name: beacon-library-frontend
+    volumes:
+      - ./Library/frontend:/app
+      - beacon_library_frontend-node-modules:/app/node_modules
+    environment:
+      ENV: ${ENV:-local}
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_ENABLE_AUTH: ${VITE_ENABLE_AUTH:-false}
+      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-https://keycloak.beacon.famillelallier.net}
+      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-beacon}
+      VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-beacon-library}
+    command: ["npm", "run", "dev", "--", "--host", "--port", "3000"]
+    depends_on:
+      - beacon-library-backend
+    expose:
+      - "3000"
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  # =============================================================================
+  # Beacon Library Services
+  # =============================================================================
+
+  beacon-library-chromadb:
+    image: chromadb/chroma:latest
+    profiles: [library]
+    container_name: beacon-library-chromadb
+    ports:
+      - "${CHROMADB_PORT:-8100}:8000"
+    volumes:
+      - beacon_library_chromadb-data:/data
+      - ./Library/observability/chromadb/config.yaml:/config.yaml:ro
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+      ALLOW_RESET: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  beacon-library-ollama:
+    image: ollama/ollama:latest
+    profiles: [library]
+    container_name: beacon-library-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - beacon_library_ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  beacon-library-gotenberg:
+    image: gotenberg/gotenberg:8
+    profiles: [library]
+    container_name: beacon-library-gotenberg
+    ports:
+      - "${GOTENBERG_PORT:-3100}:3000"
+    command:
+      - "gotenberg"
+      - "--api-timeout=120s"
+      - "--libreoffice-restart-after=10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  beacon-library-mailhog:
+    image: mailhog/mailhog:latest
+    profiles: [library]
+    container_name: beacon-library-mailhog
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  beacon-library-mcp-vector:
+    build:
+      context: ./Library/mcp-vector
+      dockerfile: Dockerfile
+      target: ${MCP_VECTOR_TARGET:-dev}
+    profiles: [library]
+    container_name: beacon-library-mcp-vector
+    env_file:
+      - path: ./Library/.env
+        required: false
+    volumes:
+      - ./Library/mcp-vector:/app
+    environment:
+      ENV: ${ENV:-local}
+      # ChromaDB
+      CHROMADB_HOST: beacon-library-chromadb
+      CHROMADB_PORT: 8000
+      # Ollama
+      OLLAMA_HOST: beacon-library-ollama
+      OLLAMA_PORT: 11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # PostgreSQL (for library metadata and access control)
+      POSTGRES_HOST: beacon-library-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-beacon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-beacon_library}
+      # MCP settings
+      MCP_RATE_LIMIT_REQUESTS: ${MCP_RATE_LIMIT_REQUESTS:-100}
+      MCP_RATE_LIMIT_WINDOW: ${MCP_RATE_LIMIT_WINDOW:-60}
+      MCP_DEFAULT_WRITE_ENABLED: ${MCP_DEFAULT_WRITE_ENABLED:-false}
+      # Vector search settings
+      DEFAULT_TOP_K: ${DEFAULT_TOP_K:-8}
+      LOW_CONFIDENCE_THRESHOLD: ${LOW_CONFIDENCE_THRESHOLD:-0.3}
+      # Observability
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://beacon-library-alloy:4317}
+      OTLP_ENABLED: ${OTLP_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command:
+      [
+        "poetry",
+        "run",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+        "--reload",
+      ]
+    depends_on:
+      beacon-library-postgres:
+        condition: service_healthy
+      beacon-library-chromadb:
+        condition: service_healthy
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  # =============================================================================
+  # Beacon Library Admin Services
+  # =============================================================================
+  beacon-library-pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: beacon-library-pgadmin
+    profiles: [admin]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@beacon.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - beacon_library_pgadmin-data:/var/lib/pgadmin
+      - ./Library/admin/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      beacon-library-postgres:
+        condition: service_healthy
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  beacon-library-redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: beacon-library-redis-commander
+    profiles: [admin]
+    environment:
+      REDIS_HOSTS: local:beacon-library-redis:6379
+      HTTP_USER: ${REDIS_COMMANDER_USER:-}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-}
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
+    depends_on:
+      beacon-library-redis:
+        condition: service_healthy
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+
+  beacon-library-ollama-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: beacon-library-ollama-webui
+    profiles: [admin]
+    environment:
+      OLLAMA_BASE_URL: http://beacon-library-ollama:11434
+      WEBUI_AUTH: "false"
+      ENABLE_SIGNUP: "false"
+      ENABLE_LOGIN_FORM: "false"
+    ports:
+      - "${OLLAMA_WEBUI_PORT:-8082}:8080"
+    volumes:
+      - beacon_library_ollama-webui-data:/app/backend/data
+    depends_on:
+      - beacon-library-ollama
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =============================================================================
+  # Beacon Library Observability Collectors
+  # =============================================================================
+  beacon-library-promtail:
+    image: grafana/promtail:3.0.0
+    container_name: beacon-library-promtail
+    profiles:
+      - observability
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./Library/observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    environment:
+      LOKI_URL: ${LOKI_URL:-http://beacon-loki:3100}
+    networks:
+      - beacon_library_net
+      - monitoring_net
+    restart: unless-stopped
+    depends_on:
+      - beacon-library-backend
+      - beacon-library-frontend
+
+  beacon-library-alloy:
+    image: grafana/alloy:v1.4.0
+    container_name: beacon-library-alloy
+    profiles:
+      - observability
+    volumes:
+      - ./Library/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: run /etc/alloy/config.alloy
+    environment:
+      ENV_LABEL: ${ENV:-local}
+      PROMETHEUS_WRITE_URL: ${PROMETHEUS_URL:-http://beacon-prometheus:9090}/api/v1/write
+      TEMPO_ENDPOINT: ${TEMPO_URL:-beacon-tempo:4317}
+    networks:
+      - beacon_library_net
+      - monitoring_net
+    restart: unless-stopped
+    depends_on:
+      - beacon-library-cadvisor
+      - beacon-library-backend
+
+  beacon-library-cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: beacon-library-cadvisor
+    profiles:
+      - observability
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    expose:
+      - "8080"
+    networks:
+      - beacon_library_net
+    restart: unless-stopped
 
 volumes:
   beacon_grafana-data:
@@ -342,6 +934,26 @@ volumes:
   beacon_minio2-data:
   beacon_minio3-data:
   beacon_keycloak-db-data:
+  beacon_technitium-data:
+  beacon_n8n-data:
+  beacon_library_postgres-data:
+    name: beacon-library_postgres_data
+  beacon_library_redis-data:
+    name: beacon-library_redis_data
+  beacon_library_chromadb-data:
+    name: beacon-library_chromadb_data
+  beacon_library_ollama-data:
+    name: beacon-library_ollama_data
+  beacon_library_frontend-node-modules:
+    name: beacon-library_frontend_node_modules
+  beacon_library_pgadmin-data:
+    name: beacon-library_pgadmin_data
+  beacon_library_ollama-webui-data:
+    name: beacon-library_ollama_webui_data
+  beacon_library_npm-data:
+    name: beacon-library_npm_data
+  beacon_library_npm-letsencrypt:
+    name: beacon-library_npm_letsencrypt
 
 networks:
   nginx_net:

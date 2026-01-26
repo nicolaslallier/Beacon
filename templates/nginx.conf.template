@@ -78,6 +78,16 @@ http {
         default http://${UPSTREAM_BEACON_LIBRARY_HOST}:${UPSTREAM_BEACON_LIBRARY_PORT};
     }
 
+    # Map for MCP Vector upstream
+    map "" ${DOLLAR}mcp_vector_upstream {
+        default http://${UPSTREAM_MCP_VECTOR_HOST}:${UPSTREAM_MCP_VECTOR_PORT};
+    }
+
+    # Map for API Gateway upstream (Traefik)
+    map "" ${DOLLAR}beacon_gateway_upstream {
+        default http://${UPSTREAM_GATEWAY_HOST}:${UPSTREAM_GATEWAY_PORT};
+    }
+
     # Map for ChromaDB Admin upstream (Beacon Library network)
     map "" ${DOLLAR}chromadb_admin_upstream {
         default http://${UPSTREAM_CHROMADB_ADMIN_HOST}:${UPSTREAM_CHROMADB_ADMIN_PORT};
@@ -92,6 +102,11 @@ http {
     # Map for Keycloak upstream
     map "" ${DOLLAR}keycloak_upstream {
         default http://${UPSTREAM_KEYCLOAK_HOST}:${UPSTREAM_KEYCLOAK_PORT};
+    }
+
+    # Map for n8n upstream
+    map "" ${DOLLAR}n8n_upstream {
+        default http://${UPSTREAM_N8N_HOST}:${UPSTREAM_N8N_PORT};
     }
 
     # Map for WebSocket connection upgrade
@@ -150,6 +165,22 @@ http {
             add_header Content-Type text/plain;
         }
 
+        # OAuth2 proxy endpoints
+        location /oauth2/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
+            proxy_buffering off;
+            proxy_redirect off;
+        }
+
+        # API gateway entry point
+        location /api/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
+            proxy_buffering off;
+            proxy_redirect off;
+        }
+
         # MCP SSE endpoint - must use HTTP/1.1 for Server-Sent Events
         location /api/mcp/sse {
             proxy_set_header Host $host;
@@ -159,7 +190,7 @@ http {
             proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Port $server_port;
             
-            proxy_pass ${DOLLAR}beacon_library_upstream;
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
             
             # Critical SSE settings
             proxy_http_version 1.1;
@@ -540,7 +571,6 @@ http {
 
     # ===========================================
     # MCP Vector Server HTTPS server block
-    # Routes through Beacon-Library NGINX at /mcp-vector/
     # ===========================================
     server {
         listen 443 ssl;
@@ -574,8 +604,7 @@ http {
             proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Port $server_port;
             
-            # Route through Beacon-Library NGINX
-            proxy_pass ${DOLLAR}beacon_library_upstream/mcp-vector/mcp/sse;
+            proxy_pass ${DOLLAR}mcp_vector_upstream/mcp/sse;
             
             # Critical SSE settings
             proxy_http_version 1.1;
@@ -591,7 +620,7 @@ http {
             chunked_transfer_encoding on;
         }
 
-        # MCP Vector Server proxy - route through Beacon-Library NGINX
+        # MCP Vector Server proxy
         location / {
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -600,9 +629,7 @@ http {
             proxy_set_header X-Forwarded-Host $host;
             proxy_set_header X-Forwarded-Port $server_port;
             
-            # Rewrite and route through Beacon-Library NGINX
-            rewrite ^/(.*) /mcp-vector/$1 break;
-            proxy_pass ${DOLLAR}beacon_library_upstream;
+            proxy_pass ${DOLLAR}mcp_vector_upstream;
             
             proxy_buffering off;
             proxy_redirect off;
@@ -658,6 +685,49 @@ http {
             proxy_buffer_size 128k;
             proxy_buffers 4 256k;
             proxy_busy_buffers_size 256k;
+        }
+    }
+
+    # ===========================================
+    # n8n HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name n8n.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # n8n proxy
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}n8n_upstream;
+
+            # n8n-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support (n8n UI)
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
         }
     }
 

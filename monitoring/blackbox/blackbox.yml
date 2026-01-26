@@ -1,0 +1,26 @@
+# Blackbox Exporter configuration for DNS probes
+modules:
+  dns_technitium:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: google.com
+      query_type: A
+      transport_protocol: udp
+      preferred_ip_protocol: ip4
+      valid_rcodes:
+        - NOERROR
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      headers:
+        Host: beacon.famillelallier.net
+      tls_config:
+        insecure_skip_verify: true
+        server_name: beacon.famillelallier.net
+  tcp_connect:
+    prober: tcp
+    timeout: 5s

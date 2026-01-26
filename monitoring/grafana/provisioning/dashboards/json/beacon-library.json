@@ -30,7 +30,7 @@
       "title": "Explore Logs",
       "tooltip": "Open Grafana Explore with Loki",
       "type": "link",
-      "url": "/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Loki%22,%7B%22expr%22:%22%7Bjob%3D%5C%22beacon-library%5C%22%7D%22%7D%5D"
+      "url": "/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Loki%22,%7B%22expr%22:%22%7Bcontainer%3D~%5C%22/beacon-library-.*%5C%22%7D%22%7D%5D"
     },
     {
       "asDropdown": false,
@@ -57,64 +57,8 @@
       },
       "id": 100,
       "panels": [],
-      "title": "Overview",
+      "title": "Nginx (Entry Point)",
       "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "$datasource_prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 1
-      },
-      "id": 1,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource_prometheus"
-          },
-          "expr": "count(container_last_seen{name=~\"beacon-library-.*\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Running Containers",
-      "type": "stat"
     },
     {
       "datasource": {
@@ -152,7 +96,63 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource_prometheus"
+          },
+          "expr": "probe_success{job=\"blackbox-http\",instance=\"http://nginx/healthz\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Nginx Health",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource_prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
         }
       },
       "gridPos": {
@@ -181,21 +181,11 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "up{compose_project=\"beacon-library\",instance=~\"backend.*\"}",
-          "legendFormat": "Backend API",
+          "expr": "probe_http_status_code{job=\"blackbox-http\",instance=\"http://nginx/healthz\"}",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource_prometheus"
-          },
-          "expr": "up{compose_project=\"beacon-library\",instance=~\"cadvisor.*\"} or vector(1)",
-          "legendFormat": "cAdvisor",
-          "refId": "B"
         }
       ],
-      "title": "Service Health",
+      "title": "Nginx Status Code",
       "type": "stat"
     },
     {
@@ -234,7 +224,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["sum"],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -247,11 +237,11 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(increase(http_requests_total{compose_project=\"beacon-library\"}[$__range])) or vector(0)",
+          "expr": "probe_duration_seconds{job=\"blackbox-http\",instance=\"http://nginx/healthz\"}",
           "refId": "A"
         }
       ],
-      "title": "Total Requests",
+      "title": "Nginx Response Time",
       "type": "stat"
     },
     {
@@ -265,7 +255,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
-          "max": 100,
+          "max": 10,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -284,7 +274,7 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -311,11 +301,11 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "(sum(rate(http_requests_total{compose_project=\"beacon-library\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{compose_project=\"beacon-library\"}[5m]))) * 100 or vector(0)",
+          "expr": "probe_http_redirects{job=\"blackbox-http\",instance=\"http://nginx/healthz\"}",
           "refId": "A"
         }
       ],
-      "title": "Error Rate (5xx)",
+      "title": "Nginx Redirects",
       "type": "gauge"
     },
     {
@@ -367,11 +357,11 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(http_requests_inprogress{compose_project=\"beacon-library\"}) or vector(0)",
+          "expr": "probe_http_content_length{job=\"blackbox-http\",instance=\"http://nginx/healthz\"}",
           "refId": "A"
         }
       ],
-      "title": "Requests In Progress",
+      "title": "Nginx Content Length",
       "type": "stat"
     },
     {
@@ -466,8 +456,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(http_requests_total{compose_project=\"beacon-library\"}[5m])) by (handler)",
-          "legendFormat": "{{handler}}",
+          "expr": "sum by (endpoint) (label_replace(label_replace(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\"}[5m]), \"endpoint\", \"$1\", \"handler\", \"(.*)\"), \"endpoint\", \"$1\", \"path\", \"(.*)\"))",
+          "legendFormat": "{{endpoint}}",
           "refId": "A"
         }
       ],
@@ -561,7 +551,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{compose_project=\"beacon-library\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{compose_project=\"beacon-library\",job=\"backend\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
@@ -570,7 +560,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{compose_project=\"beacon-library\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{compose_project=\"beacon-library\",job=\"backend\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
         },
@@ -579,7 +569,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{compose_project=\"beacon-library\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{compose_project=\"beacon-library\",job=\"backend\"}[5m])) by (le))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -728,7 +718,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(http_requests_total{compose_project=\"beacon-library\"}[5m])) by (status)",
+          "expr": "sum by (status) (label_replace(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\"}[5m]), \"status\", \"$1\", \"status_code\", \"(.*)\"))",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -823,7 +813,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(http_requests_total{compose_project=\"beacon-library\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{compose_project=\"beacon-library\"}[5m]))",
+          "expr": "(sum(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\",status=~\"5..\"}[5m])) or sum(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\",status_code=~\"5..\"}[5m]))) / sum(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\"}[5m]))",
           "legendFormat": "5xx Error Rate",
           "refId": "A"
         },
@@ -832,7 +822,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(http_requests_total{compose_project=\"beacon-library\",status=~\"4..\"}[5m])) / sum(rate(http_requests_total{compose_project=\"beacon-library\"}[5m]))",
+          "expr": "(sum(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\",status=~\"4..\"}[5m])) or sum(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\",status_code=~\"4..\"}[5m]))) / sum(rate(http_requests_total{compose_project=\"beacon-library\",job=\"backend\"}[5m]))",
           "legendFormat": "4xx Error Rate",
           "refId": "B"
         }
@@ -932,8 +922,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"beacon-library-.*\",name=~\"$container\"}[5m])) by (name)",
-          "legendFormat": "{{name}}",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m])) by (id)",
+          "legendFormat": "{{id}}",
           "refId": "A"
         }
       ],
@@ -1019,8 +1009,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=~\"beacon-library-.*\",name=~\"$container\"}",
-          "legendFormat": "{{name}}",
+          "expr": "container_memory_working_set_bytes{compose_project=\"beacon-library\",id=~\"$container\"}",
+          "legendFormat": "{{id}}",
           "refId": "A"
         }
       ],
@@ -1106,8 +1096,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_network_receive_bytes_total{name=~\"beacon-library-.*\",name=~\"$container\"}[5m])) by (name)",
-          "legendFormat": "{{name}} RX",
+          "expr": "sum(rate(container_network_receive_bytes_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m])) by (id)",
+          "legendFormat": "{{id}} RX",
           "refId": "A"
         },
         {
@@ -1115,8 +1105,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_network_transmit_bytes_total{name=~\"beacon-library-.*\",name=~\"$container\"}[5m])) by (name)",
-          "legendFormat": "{{name}} TX",
+          "expr": "sum(rate(container_network_transmit_bytes_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m])) by (id)",
+          "legendFormat": "{{id}} TX",
           "refId": "B"
         }
       ],
@@ -1202,8 +1192,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_fs_reads_bytes_total{name=~\"beacon-library-.*\",name=~\"$container\"}[5m])) by (name)",
-          "legendFormat": "{{name}} Read",
+          "expr": "sum(rate(container_fs_reads_bytes_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m])) by (id)",
+          "legendFormat": "{{id}} Read",
           "refId": "A"
         },
         {
@@ -1211,8 +1201,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_fs_writes_bytes_total{name=~\"beacon-library-.*\",name=~\"$container\"}[5m])) by (name)",
-          "legendFormat": "{{name}} Write",
+          "expr": "sum(rate(container_fs_writes_bytes_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m])) by (id)",
+          "legendFormat": "{{id}} Write",
           "refId": "B"
         }
       ],
@@ -1311,7 +1301,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=\"beacon-library-db\"}",
+          "expr": "container_memory_working_set_bytes{compose_project=\"beacon-library\",id=~\"$container\"}",
           "legendFormat": "PostgreSQL Memory",
           "refId": "A"
         }
@@ -1398,7 +1388,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=\"beacon-library-redis\"}",
+          "expr": "container_memory_working_set_bytes{compose_project=\"beacon-library\",id=~\"$container\"}",
           "legendFormat": "Redis Memory",
           "refId": "A"
         }
@@ -1485,7 +1475,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=\"beacon-library-chromadb\"}",
+          "expr": "container_memory_working_set_bytes{compose_project=\"beacon-library\",id=~\"$container\"}",
           "legendFormat": "ChromaDB Memory",
           "refId": "A"
         }
@@ -1571,7 +1561,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_last_seen{name=\"beacon-library-chromadb\"} > 0",
+          "expr": "container_last_seen{compose_project=\"beacon-library\",id=~\"$container\"} > 0",
           "legendFormat": "ChromaDB",
           "refId": "A"
         }
@@ -1644,7 +1634,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_last_seen{name=\"beacon-library-ollama\"} > 0",
+          "expr": "container_last_seen{compose_project=\"beacon-library\",id=~\"$container\"} > 0",
           "legendFormat": "Ollama",
           "refId": "A"
         }
@@ -1717,7 +1707,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_last_seen{name=\"beacon-library-gotenberg\"} > 0",
+          "expr": "container_last_seen{compose_project=\"beacon-library\",id=~\"$container\"} > 0",
           "legendFormat": "Gotenberg",
           "refId": "A"
         }
@@ -1790,7 +1780,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_last_seen{name=\"beacon-library-mailhog\"} > 0",
+          "expr": "container_last_seen{compose_project=\"beacon-library\",id=~\"$container\"} > 0",
           "legendFormat": "MailHog",
           "refId": "A"
         }
@@ -1855,8 +1845,8 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "changes(container_start_time_seconds{name=~\"beacon-library-.*\"}[1h])",
-          "legendFormat": "{{name}}",
+          "expr": "changes(container_start_time_seconds{compose_project=\"beacon-library\"}[1h])",
+          "legendFormat": "{{id}}",
           "refId": "A"
         }
       ],
@@ -1942,7 +1932,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=\"beacon-library-ollama\"}",
+          "expr": "container_memory_working_set_bytes{compose_project=\"beacon-library\",id=~\"$container\"}",
           "legendFormat": "Ollama Memory",
           "refId": "A"
         },
@@ -1951,7 +1941,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=\"beacon-library-gotenberg\"}",
+          "expr": "container_memory_working_set_bytes{compose_project=\"beacon-library\",id=~\"$container\"}",
           "legendFormat": "Gotenberg Memory",
           "refId": "B"
         }
@@ -2038,7 +2028,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=\"beacon-library-ollama\"}[5m]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m]))",
           "legendFormat": "Ollama CPU",
           "refId": "A"
         },
@@ -2047,7 +2037,7 @@
             "type": "prometheus",
             "uid": "$datasource_prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=\"beacon-library-gotenberg\"}[5m]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{compose_project=\"beacon-library\",id=~\"$container\"}[5m]))",
           "legendFormat": "Gotenberg CPU",
           "refId": "B"
         }
@@ -2117,7 +2107,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} [$__range]))",
           "refId": "A"
         }
       ],
@@ -2181,7 +2171,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\" [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\" [$__range]))",
           "refId": "A"
         }
       ],
@@ -2245,7 +2235,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)warn\" [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)warn\" [$__range]))",
           "refId": "A"
         }
       ],
@@ -2301,7 +2291,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "count(count by (container) (count_over_time({job=\"beacon-library\"} [1m])))",
+          "expr": "count(count by (container) (count_over_time({container=~\"/beacon-library-.*\"} [1m])))",
           "refId": "A"
         }
       ],
@@ -2387,7 +2377,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum by (container) (count_over_time({job=\"beacon-library\",container=~\"$container\"} [$__interval]))",
+          "expr": "sum by (container) (count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} [$__interval]))",
           "legendFormat": "{{container}}",
           "refId": "A"
         }
@@ -2511,7 +2501,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\" [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\" [$__range]))",
           "legendFormat": "error",
           "refId": "A"
         },
@@ -2520,7 +2510,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)warn\" !~ \"(?i)error|fail|fatal|exception\" [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)warn\" !~ \"(?i)error|fail|fatal|exception\" [$__range]))",
           "legendFormat": "warn",
           "refId": "B"
         },
@@ -2529,7 +2519,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)info\" !~ \"(?i)warn|error|fail|fatal|exception\" [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)info\" !~ \"(?i)warn|error|fail|fatal|exception\" [$__range]))",
           "legendFormat": "info",
           "refId": "C"
         },
@@ -2538,7 +2528,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum(count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)debug\" !~ \"(?i)info|warn|error|fail|fatal|exception\" [$__range]))",
+          "expr": "sum(count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)debug\" !~ \"(?i)info|warn|error|fail|fatal|exception\" [$__range]))",
           "legendFormat": "debug",
           "refId": "D"
         }
@@ -2625,7 +2615,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "sum by (container) (count_over_time({job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\" [$__interval]))",
+          "expr": "sum by (container) (count_over_time({container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\" [$__interval]))",
           "legendFormat": "{{container}}",
           "refId": "A"
         }
@@ -2662,7 +2652,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "{job=\"beacon-library\",container=~\"$container\"} |~ \"$search\"",
+          "expr": "{container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"$search\"",
           "refId": "A"
         }
       ],
@@ -2698,7 +2688,7 @@
             "type": "loki",
             "uid": "$datasource_loki"
           },
-          "expr": "{job=\"beacon-library\",container=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\"",
+          "expr": "{container=~\"/beacon-library-.*\",compose_service=~\"$container\"} |~ \"(?i)error|fail|fatal|exception\"",
           "refId": "A"
         }
       ],
@@ -2799,7 +2789,7 @@
           "type": "prometheus",
           "uid": "$datasource_prometheus"
         },
-        "definition": "label_values(container_cpu_usage_seconds_total{name=~\"beacon-library-.*\"}, name)",
+        "definition": "label_values(container_cpu_usage_seconds_total{compose_project=\"beacon-library\",id!=\"/\"}, id)",
         "hide": 0,
         "includeAll": true,
         "label": "Container",
@@ -2807,7 +2797,7 @@
         "name": "container",
         "options": [],
         "query": {
-          "query": "label_values(container_cpu_usage_seconds_total{name=~\"beacon-library-.*\"}, name)",
+          "query": "label_values(container_cpu_usage_seconds_total{compose_project=\"beacon-library\",id!=\"/\"}, id)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

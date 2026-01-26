@@ -1,0 +1,367 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: beacon-library-nginx
+    ports:
+      - "8181:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: beacon-library-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-beacon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-beacon_library}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beacon_user} -d ${POSTGRES_DB:-beacon_library}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beacon-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: beacon-library-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: ${BACKEND_TARGET:-dev}
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./backend:/app
+    environment:
+      ENV: ${ENV:-local}
+      # Database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-beacon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-beacon_library}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MinIO - Connect to Beacon's MinIO cluster
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-beacon-minio1:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      # Keycloak - Connect to Beacon's Keycloak
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://beacon-keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-beacon}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-beacon-library}
+      ENABLE_AUTH: ${ENABLE_AUTH:-false}  # Disable auth for development by default
+      # ChromaDB - Semantic search
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: 8000
+      # Ollama - Embeddings
+      OLLAMA_HOST: ollama
+      OLLAMA_PORT: 11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # Gotenberg - Document conversion
+      GOTENBERG_URL: http://gotenberg:3000
+      # SMTP - Email notifications
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@beacon.local}
+      # Observability
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://beacon-library-alloy:4317}
+      OTLP_ENABLED: ${OTLP_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+    expose:
+      - "8000"
+    # Expose MCP API directly for local agents (LM Studio, etc.)
+    # This allows agents to connect via HTTP without SSL certificate issues
+    ports:
+      - "${MCP_PORT:-8200}:8000"
+    networks:
+      - beacon-network
+      - beacon_keycloak_net  # Connect to Beacon's Keycloak network
+      - beacon_minio_net     # Connect to Beacon's MinIO network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: ${FRONTEND_TARGET:-dev}
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      ENV: ${ENV:-local}
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_ENABLE_AUTH: ${VITE_ENABLE_AUTH:-false}
+      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8080}
+      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-beacon}
+      VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-beacon-library}
+    command: ["npm", "run", "dev", "--", "--host", "--port", "3000"]
+    depends_on:
+      - backend
+    expose:
+      - "3000"
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Beacon-Library Specific Services
+  # =============================================================================
+
+  # ChromaDB - Vector database for semantic search
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: beacon-library-chromadb
+    ports:
+      - "${CHROMADB_PORT:-8100}:8000"
+    volumes:
+      - chromadb_data:/data
+      - ./observability/chromadb/config.yaml:/config.yaml:ro
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+      ALLOW_RESET: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  # Ollama - Local LLM for embeddings
+  ollama:
+    image: ollama/ollama:latest
+    container_name: beacon-library-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  # Gotenberg - Document conversion (LibreOffice-based)
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: beacon-library-gotenberg
+    ports:
+      - "${GOTENBERG_PORT:-3100}:3000"
+    command:
+      - "gotenberg"
+      - "--api-timeout=120s"
+      - "--libreoffice-restart-after=10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  # MailHog - SMTP testing server (dev/local only)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: beacon-library-mailhog
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"   # SMTP
+      - "${MAILHOG_UI_PORT:-8025}:8025"     # Web UI
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  # MCP Vector Server - ChromaDB operations as MCP tools for RAG workflows
+  mcp-vector:
+    build:
+      context: ./mcp-vector
+      dockerfile: Dockerfile
+      target: ${MCP_VECTOR_TARGET:-dev}
+    container_name: beacon-library-mcp-vector
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./mcp-vector:/app
+    environment:
+      ENV: ${ENV:-local}
+      # ChromaDB
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: 8000
+      # Ollama
+      OLLAMA_HOST: ollama
+      OLLAMA_PORT: 11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # PostgreSQL (for library metadata and access control)
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-beacon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-beacon_library}
+      # MCP settings
+      MCP_RATE_LIMIT_REQUESTS: ${MCP_RATE_LIMIT_REQUESTS:-100}
+      MCP_RATE_LIMIT_WINDOW: ${MCP_RATE_LIMIT_WINDOW:-60}
+      MCP_DEFAULT_WRITE_ENABLED: ${MCP_DEFAULT_WRITE_ENABLED:-false}
+      # Vector search settings
+      DEFAULT_TOP_K: ${DEFAULT_TOP_K:-8}
+      LOW_CONFIDENCE_THRESHOLD: ${LOW_CONFIDENCE_THRESHOLD:-0.3}
+      # Observability
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-http://beacon-library-alloy:4317}
+      OTLP_ENABLED: ${OTLP_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Observability Stack - Collectors and Agents
+  # =============================================================================
+
+  # Promtail - Docker log collection to Loki
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: beacon-library-promtail
+    profiles:
+      - observability
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    environment:
+      LOKI_URL: ${LOKI_URL:-http://beacon-loki:3100}
+    networks:
+      - beacon-network
+      - beacon_monitoring_net
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+
+  # Grafana Alloy - Metrics scraping and OTLP trace collection
+  alloy:
+    image: grafana/alloy:v1.4.0
+    container_name: beacon-library-alloy
+    profiles:
+      - observability
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    command: run /etc/alloy/config.alloy
+    environment:
+      ENV_LABEL: ${ENV:-local}
+      PROMETHEUS_WRITE_URL: ${PROMETHEUS_URL:-http://beacon-prometheus:9090}/api/v1/write
+      TEMPO_ENDPOINT: ${TEMPO_URL:-beacon-tempo:4317}
+    networks:
+      - beacon-network
+      - beacon_monitoring_net
+    restart: unless-stopped
+    depends_on:
+      - cadvisor
+      - backend
+
+  # cAdvisor - Container metrics exporter
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: beacon-library-cadvisor
+    profiles:
+      - observability
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    expose:
+      - "8080"
+    networks:
+      - beacon-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  chromadb_data:
+    driver: local
+  ollama_data:
+    driver: local
+  frontend_node_modules:
+    driver: local
+
+networks:
+  beacon-network:
+    driver: bridge
+  # External networks from Beacon project
+  beacon_monitoring_net:
+    external: true
+  beacon_keycloak_net:
+    external: true
+  beacon_minio_net:
+    external: true

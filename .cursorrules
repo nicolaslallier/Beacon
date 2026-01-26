@@ -66,3 +66,26 @@ When generating docker-compose.yml:
 - Include inline comments for complex configurations
 - Group related environment variables
 - Use profiles for optional services
+
+## Beacon Library Rules
+
+### Backend (FastAPI)
+- Keep API routers in `Library/backend/app/api` and business logic in `Library/backend/app/services`
+- Prefer Pydantic schemas in `Library/backend/app/schemas` for request/response validation
+- Keep DB models in `Library/backend/app/models`; avoid DB access in router modules
+- Follow existing dependency injection in `Library/backend/app/api/deps.py`
+
+### Frontend (React + Vite)
+- Keep reusable UI in `Library/frontend/src/components` and pages in `Library/frontend/src/pages`
+- Prefer hooks in `Library/frontend/src/hooks` for shared logic
+- Use services in `Library/frontend/src/services` for API calls
+- Keep i18n strings in `Library/frontend/src/i18n/locales`
+
+### Desktop (Electron)
+- Keep main process code in `Library/desktop/src/main`
+- Keep preload bridge in `Library/desktop/src/preload`
+- Avoid direct renderer access to Node APIs; use preload IPC
+
+### MCP Services
+- Keep MCP tool definitions in `Library/mcp-agent` and `Library/mcp-vector`
+- Preserve existing tool names and payload shapes for compatibility

@@ -83,6 +83,91 @@ Create a `.env` file or export desired values before running. All configurable v
 
 **Important**: Set `GF_SECURITY_ADMIN_PASSWORD` in your `.env` file before starting the monitoring stack. Never commit passwords to version control.
 
+### Technitium DNS Variables
+
+| Variable                      | Default    | Description                              |
+|-------------------------------|------------|------------------------------------------|
+| TECHNITIUM_DNS_PORT           | 8053       | Host port for DNS service (UDP/TCP)      |
+| TECHNITIUM_WEB_PORT           | 5380       | Host port for Technitium web GUI         |
+
+**Note**: The default DNS port is `8053` to avoid conflicts with system DNS (port 53 requires root privileges) and macOS mDNSResponder (port 5353). To use port 53, you'll need to run Docker with appropriate privileges or configure port forwarding.
+
+---
+
+## Technitium DNS Server (Ranger DNS GUI)
+
+The Beacon stack now uses Technitium DNS Server for DNS management. It provides a web GUI and persistent configuration stored in a Docker volume.
+
+### Starting the DNS Service
+
+The DNS service starts automatically with the main stack:
+
+```bash
+make up
+# or
+docker compose up -d
+```
+
+To start only the DNS service:
+
+```bash
+docker compose up -d technitium-dns
+```
+
+### Web GUI
+
+- Access: `http://localhost:${TECHNITIUM_WEB_PORT:-5380}`
+- On first launch, the UI will prompt you to set up admin access and basic settings.
+
+### Configuring macOS to Use Technitium DNS
+
+macOS system DNS settings only accept IP addresses (not IP:port). Since Technitium DNS runs on port 8053 by default, use one of the following options:
+
+**Option A: Port Forwarding (Recommended)**
+
+Forward port 53 to 8053 with `socat`:
+
+```bash
+# Install socat if needed: brew install socat
+sudo socat UDP4-LISTEN:53,fork UDP4:127.0.0.1:8053 &
+sudo socat TCP4-LISTEN:53,fork TCP4:127.0.0.1:8053 &
+```
+
+Then configure macOS DNS to use `127.0.0.1`:
+
+```bash
+sudo networksetup -setdnsservers Wi-Fi 127.0.0.1
+```
+
+**Option B: Use Port 53 Directly**
+
+Set `TECHNITIUM_DNS_PORT=53` in `.env` and restart. Note: This may require Docker to run with elevated privileges.
+
+### Testing DNS Resolution
+
+```bash
+# Query the DNS server directly (on custom port)
+dig @127.0.0.1 -p 8053 google.com
+
+# Query via system DNS (if port forwarding is set up)
+dig @127.0.0.1 google.com
+
+# Check DNS server logs
+docker logs beacon-technitium-dns
+```
+
+### Prometheus DNS Probe Metrics
+
+DNS availability and latency are tracked via Blackbox Exporter. The probe targets the Technitium DNS service and exposes metrics in Prometheus.
+
+### Troubleshooting
+
+- **DNS not resolving?** Ensure the `technitium-dns` container is running: `docker ps | grep technitium`
+- **Port conflicts?** Change `TECHNITIUM_DNS_PORT` in `.env` if port 8053 is already in use
+- **macOS not using DNS?** Verify DNS settings: `scutil --dns | grep nameserver`
+- **Port 5353 already in use?** This is normal on macOS (used by mDNSResponder). The default port is 8053
+- **Permission denied?** Port 53 requires root. Use port 8053 (default) with port forwarding, or run Docker with appropriate privileges
+
 ---
 
 ## Architecture

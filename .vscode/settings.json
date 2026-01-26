@@ -70,5 +70,8 @@
   "editor.rulers": [80, 120],
 
   // Hadolint (Dockerfile linting) settings
-  "hadolint.hadolintPath": "hadolint"
+  "hadolint.hadolintPath": "hadolint",
+  "containers.containers.sortBy": "CreatedTime",
+  "containers.images.sortBy": "CreatedTime",
+  "containers.truncateLongRegistryPaths": true
 }

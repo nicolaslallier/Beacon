@@ -110,3 +110,14 @@ groups:
         annotations:
           summary: 'Low free space on MinIO node {{ $labels.instance }}'
           description: 'Free space below 10GB on {{ $labels.instance }}.'
+
+  - name: dns-probe-alerts
+    rules:
+      - alert: DNSProbeDown
+        expr: probe_success{job="dns-probe"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'DNS probe failed for {{ $labels.instance }}'
+          description: 'DNS probe has been failing for more than 1 minute.'
