@@ -37,6 +37,19 @@ help:
 	$(call help_line,auth-status,Statut health auth (Keycloak))
 	$(call help_line,reset-grafana,Reset Grafana (delete data, use new password))
 	$(call help_line,reset-keycloak,Reset Keycloak (delete data))
+	@printf "\n## Infra\n"
+	@printf "### pgAdmin\n"
+	$(call help_line,up-pgadmin,Start pgAdmin service)
+	$(call help_line,down-pgadmin,Stop pgAdmin service)
+	$(call help_line,pgadmin-logs,Logs for pgAdmin service)
+	$(call help_line,pgadmin-status,Status for pgAdmin service)
+	$(call help_line,pgadmin-reset,Reset pgAdmin (delete data))
+	@printf "\n## VectorDB\n"
+	$(call help_line,vectordb-up,Start VectorDB services)
+	$(call help_line,vectordb-down,Stop VectorDB services)
+	$(call help_line,vectordb-logs,Logs for VectorDB services)
+	$(call help_line,vectordb-status,Status for VectorDB services)
+	$(call help_line,vectordb-test,Run VectorDB connectivity test query)
 	@printf "\n## Beacon Library\n"
 	$(call help_line,library-install,Install backend and frontend deps)
 	$(call help_line,library-dev,Run backend + frontend in dev mode)

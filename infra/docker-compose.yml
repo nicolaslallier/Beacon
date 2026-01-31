@@ -47,12 +47,20 @@ services:
       - UPSTREAM_CHROMADB_ADMIN_PORT=${UPSTREAM_CHROMADB_ADMIN_PORT:-3001}
       - UPSTREAM_CHROMADB_HOST=${UPSTREAM_CHROMADB_HOST:-chromadb}
       - UPSTREAM_CHROMADB_PORT=${UPSTREAM_CHROMADB_PORT:-8000}
+      - UPSTREAM_VECTORDB_HOST=${UPSTREAM_VECTORDB_HOST:-vectordb}
+      - UPSTREAM_VECTORDB_PORT=${UPSTREAM_VECTORDB_PORT:-5432}
       - UPSTREAM_OLLAMA_HOST=${UPSTREAM_OLLAMA_HOST:-beacon-library-ollama}
       - UPSTREAM_OLLAMA_PORT=${UPSTREAM_OLLAMA_PORT:-11434}
       - UPSTREAM_KEYCLOAK_HOST=${UPSTREAM_KEYCLOAK_HOST:-keycloak}
       - UPSTREAM_KEYCLOAK_PORT=${UPSTREAM_KEYCLOAK_PORT:-8080}
       - UPSTREAM_N8N_HOST=${UPSTREAM_N8N_HOST:-n8n}
       - UPSTREAM_N8N_PORT=${UPSTREAM_N8N_PORT:-5678}
+      - UPSTREAM_PGADMIN_HOST=${UPSTREAM_PGADMIN_HOST:-pgadmin}
+      - UPSTREAM_PGADMIN_PORT=${UPSTREAM_PGADMIN_PORT:-80}
+      - UPSTREAM_PGADMIN_VECTORDB_HOST=${UPSTREAM_PGADMIN_VECTORDB_HOST:-pgadmin-vectordb}
+      - UPSTREAM_PGADMIN_VECTORDB_PORT=${UPSTREAM_PGADMIN_VECTORDB_PORT:-80}
+      - UPSTREAM_TECHNITIUM_HOST=${UPSTREAM_TECHNITIUM_HOST:-technitium}
+      - UPSTREAM_TECHNITIUM_PORT=${UPSTREAM_TECHNITIUM_PORT:-5380}
       - MAX_BODY_SIZE=${MAX_BODY_SIZE:-50m}
       - GZIP_ENABLED=${GZIP_ENABLED:-on}
       # SSL Configuration
@@ -119,6 +127,8 @@ services:
       OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
       OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
       OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
       OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
     expose:
       - "4180"
@@ -205,11 +215,16 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
-      - GF_SERVER_ROOT_URL=http://grafana.beacon.famillelallier.net
-      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SERVER_ROOT_URL=https://beacon.famillelallier.net/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
       # Proxy settings for reverse proxy
-      - GF_SERVER_DOMAIN=grafana.beacon.famillelallier.net
+      - GF_SERVER_DOMAIN=beacon.famillelallier.net
       - GF_SERVER_PROTOCOL=http
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
+      - GF_AUTH_PROXY_HEADERS=Email:X-WEBAUTH-EMAIL
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
     # Port mapping removed - Grafana accessed via NGINX proxy at grafana.beacon.famillelallier.net
     # ports:
     #   - "${GRAFANA_PORT:-3000}:3000"
@@ -700,25 +715,49 @@ services:
   # =============================================================================
   # Beacon Library Admin Services
   # =============================================================================
-  beacon-library-pgadmin:
-    image: dpage/pgadmin4:8
-    container_name: beacon-library-pgadmin
+  pgadmin:
+    image: dpage/pgadmin4:9.11
+    container_name: beacon-pgadmin
     profiles: [admin]
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@beacon.local}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
+      PGADMIN_CONFIG_SCRIPT_NAME: "'/pgadmin'"
+    expose:
+      - "80"
     volumes:
-      - beacon_library_pgadmin-data:/var/lib/pgadmin
-      - ../applications/Library/admin/pgadmin/servers.json:/pgadmin4/servers.json:ro
-    depends_on:
-      beacon-library-postgres:
-        condition: service_healthy
+      - beacon_vectordb_pgadmin-data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
     networks:
-      - beacon_library_net
+      - nginx_net
+      - monitoring_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  pgadmin-vectordb:
+    image: dpage/pgadmin4:9.11
+    container_name: beacon-pgadmin-vectordb
+    profiles: [admin]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@beacon.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_CONFIG_SCRIPT_NAME: "'/vectordb'"
+    expose:
+      - "80"
+    volumes:
+      - beacon_vectordb_pgadmin-vectordb-data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - nginx_net
+      - monitoring_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
@@ -756,8 +795,6 @@ services:
       - "${OLLAMA_WEBUI_PORT:-8082}:8080"
     volumes:
       - beacon_library_ollama-webui-data:/app/backend/data
-    depends_on:
-      - beacon-library-ollama
     networks:
       - beacon_library_net
     restart: unless-stopped
@@ -851,8 +888,10 @@ volumes:
   beacon_library_ollama-data:
     name: beacon-library_ollama_data
     external: true
-  beacon_library_pgadmin-data:
-    name: beacon-library_pgadmin_data
+  beacon_vectordb_pgadmin-data:
+    name: beacon-vectordb_pgadmin_data
+  beacon_vectordb_pgadmin-vectordb-data:
+    name: beacon-vectordb_pgadmin_vectordb_data
   beacon_library_ollama-webui-data:
     name: beacon-library_ollama_webui_data
   beacon_library_npm-data:

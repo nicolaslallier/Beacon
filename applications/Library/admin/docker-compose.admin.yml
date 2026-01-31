@@ -10,35 +10,6 @@
 
 services:
   # ---------------------------------------------------------------------------
-  # pgAdmin 4 - PostgreSQL Management
-  # ---------------------------------------------------------------------------
-  pgadmin:
-    image: dpage/pgadmin4:8
-    container_name: beacon-library-pgadmin
-    profiles: ["admin"]
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@beacon.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./admin/pgadmin/servers.json:/pgadmin4/servers.json:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - beacon-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ---------------------------------------------------------------------------
   # Redis Commander - Redis Cache Management
   # ---------------------------------------------------------------------------
   redis-commander:
@@ -136,8 +107,6 @@ services:
 # Volumes for Admin Services
 # =============================================================================
 volumes:
-  pgadmin_data:
-    driver: local
   ollama_webui_data:
     driver: local
   npm_data:

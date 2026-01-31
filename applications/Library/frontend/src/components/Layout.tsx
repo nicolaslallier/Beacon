@@ -35,7 +35,7 @@ export default function Layout() {
               </div>
 
               {/* Quick Links */}
-              <div className="flex items-center gap-6 text-sm">
+              <div className="flex flex-wrap items-center gap-6 text-sm">
                 <Link to="/libraries" className="text-slate-600 hover:text-indigo-600 transition-colors">
                   Libraries
                 </Link>
@@ -48,6 +48,25 @@ export default function Layout() {
                 <Link to="/about" className="text-slate-600 hover:text-indigo-600 transition-colors">
                   About
                 </Link>
+                <span className="text-slate-300">|</span>
+                <a href="/library/" className="text-slate-600 hover:text-indigo-600 transition-colors">
+                  Library
+                </a>
+                <a href="/pgadmin/" className="text-slate-600 hover:text-indigo-600 transition-colors">
+                  PgAdmin
+                </a>
+                <a href="/vectordb/" className="text-slate-600 hover:text-indigo-600 transition-colors">
+                  VectorDB
+                </a>
+                <a href="/grafana/" className="text-slate-600 hover:text-indigo-600 transition-colors">
+                  Grafana
+                </a>
+                <a href="/minio/" className="text-slate-600 hover:text-indigo-600 transition-colors">
+                  MinIO
+                </a>
+                <a href="/DNS/" className="text-slate-600 hover:text-indigo-600 transition-colors">
+                  DNS
+                </a>
               </div>
 
               {/* Copyright */}

@@ -1,0 +1,57 @@
+services:
+  vectordb:
+    image: pgvector/pgvector:pg18
+    container_name: beacon-vectordb
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${VECTORDB_DB}
+      POSTGRES_USER: ${VECTORDB_USER}
+      POSTGRES_PASSWORD: ${VECTORDB_PASSWORD}
+    ports:
+      - "${VECTORDB_PORT:-5432}:5432"
+    volumes:
+      - vectordb-data:/var/lib/postgresql
+    networks:
+      - nginx_net
+      - monitoring_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${VECTORDB_USER} -d ${VECTORDB_DB} -p ${VECTORDB_PORT:-5432}",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  vectordb-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: beacon-vectordb-exporter
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATA_SOURCE_NAME: postgresql://${VECTORDB_USER}:${VECTORDB_PASSWORD}@vectordb:${VECTORDB_PORT:-5432}/${VECTORDB_DB}?sslmode=disable
+    expose:
+      - "9187"
+    depends_on:
+      vectordb:
+        condition: service_healthy
+    networks:
+      - nginx_net
+      - monitoring_net
+
+volumes:
+  vectordb-data:
+    name: beacon_vectordb-data
+
+networks:
+  nginx_net:
+    external: true
+    name: beacon_nginx_net
+  monitoring_net:
+    external: true
+    name: beacon_monitoring_net

@@ -101,3 +101,7 @@ scrape_configs:
   - job_name: 'keycloak-db'
     static_configs:
       - targets: ['postgres-exporter:9187']
+
+  - job_name: 'vectordb-postgres'
+    static_configs:
+      - targets: ['beacon-vectordb-exporter:9187']

@@ -10,6 +10,30 @@ events {
     worker_connections 1024;
 }
 
+stream {
+    # Docker DNS resolver for dynamic upstream resolution
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    # Stream logging format and access log
+    log_format stream_main '$remote_addr [$time_local] '
+                           '$protocol $status $bytes_sent $bytes_received '
+                           '$session_time "$upstream_addr" '
+                           '"$upstream_bytes_sent" "$upstream_bytes_received" "$upstream_connect_time"';
+    access_log /dev/stdout stream_main;
+
+    # VectorDB (PostgreSQL) TCP proxy
+    upstream vectordb_tcp_upstream {
+        server ${UPSTREAM_VECTORDB_HOST}:${UPSTREAM_VECTORDB_PORT};
+    }
+
+    server {
+        listen 5432;
+        proxy_pass vectordb_tcp_upstream;
+        proxy_timeout 300s;
+        proxy_connect_timeout 10s;
+    }
+}
+
 http {
     include       mime.types;
     default_type  application/octet-stream;
@@ -122,6 +146,21 @@ http {
     # Map for n8n upstream
     map "" ${DOLLAR}n8n_upstream {
         default http://${UPSTREAM_N8N_HOST}:${UPSTREAM_N8N_PORT};
+    }
+
+    # Map for PgAdmin upstream
+    map "" ${DOLLAR}pgadmin_upstream {
+        default http://${UPSTREAM_PGADMIN_HOST}:${UPSTREAM_PGADMIN_PORT};
+    }
+
+    # Map for PgAdmin (VectorDB) upstream
+    map "" ${DOLLAR}pgadmin_vectordb_upstream {
+        default http://${UPSTREAM_PGADMIN_VECTORDB_HOST}:${UPSTREAM_PGADMIN_VECTORDB_PORT};
+    }
+
+    # Map for Technitium upstream
+    map "" ${DOLLAR}technitium_upstream {
+        default http://${UPSTREAM_TECHNITIUM_HOST}:${UPSTREAM_TECHNITIUM_PORT};
     }
 
     # Map for WebSocket connection upgrade
@@ -853,9 +892,9 @@ http {
     # Default HTTPS server block
     # ===========================================
     server {
-        listen 443 ssl;
+        listen 443 ssl default_server;
         http2 on;
-        server_name _;
+        server_name beacon.famillelallier.net _;
 
         # SSL certificates
         ssl_certificate ${SSL_CERT_PATH};
@@ -881,36 +920,233 @@ http {
             internal;
         }
 
+        # OAuth2 proxy endpoints (used by /pgadmin auth_request)
+        location /oauth2/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
+            proxy_buffering off;
+            proxy_redirect off;
+
+            # Large buffer sizes for OAuth2 tokens (JWT can be large)
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+        }
+
         # API route - using variable for runtime DNS resolution
         location /api/ {
             include /etc/nginx/conf.d/proxy_headers.conf;
             proxy_pass ${DOLLAR}api_upstream;
         }
 
-        # Toolsuite SPA (served from /usr/share/nginx/html/toolsuite)
-        location = /toolsuite {
-            return 301 /toolsuite/;
+        # VectorDB (pgAdmin) under /vectordb
+        location = /vectordb {
+            return 301 /vectordb/;
         }
 
-        location /toolsuite/ {
-            root /usr/share/nginx/html;
-            try_files ${DOLLAR}uri ${DOLLAR}uri/ /toolsuite/index.html;
-        }
+        location /vectordb/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
 
-        # Toolsuite API (strip /toolsuite-api prefix)
-        location = /toolsuite-api {
-            return 301 /toolsuite-api/;
-        }
-
-        location /toolsuite-api/ {
             include /etc/nginx/conf.d/proxy_headers.conf;
-            proxy_pass ${DOLLAR}toolsuite_api_upstream/;
+            proxy_set_header X-Script-Name /vectordb;
+            proxy_set_header X-Forwarded-Prefix /vectordb;
+
+            proxy_pass ${DOLLAR}pgadmin_vectordb_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
         }
 
-        # Frontend/static - using variable for runtime DNS resolution
+        # PgAdmin under /pgadmin
+        location = /pgadmin {
+            return 301 /pgadmin/;
+        }
+
+        location /pgadmin/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_set_header X-Script-Name /pgadmin;
+            proxy_set_header X-Forwarded-Prefix /pgadmin;
+
+            proxy_pass ${DOLLAR}pgadmin_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+
+        # Grafana under /grafana
+        location = /grafana {
+            return 301 /grafana/;
+        }
+
+        location /grafana/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            auth_request_set ${DOLLAR}auth_user ${DOLLAR}upstream_http_x_auth_request_user;
+            auth_request_set ${DOLLAR}auth_email ${DOLLAR}upstream_http_x_auth_request_email;
+
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_set_header X-Script-Name /grafana;
+            proxy_set_header X-Forwarded-Prefix /grafana;
+            proxy_set_header X-WEBAUTH-USER ${DOLLAR}auth_user;
+            proxy_set_header X-WEBAUTH-EMAIL ${DOLLAR}auth_email;
+
+            proxy_pass ${DOLLAR}grafana_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+
+        # MinIO S3 API under /minio
+        location = /minio {
+            return 301 /minio/;
+        }
+
+        location /minio/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_set_header X-Forwarded-Prefix /minio;
+
+            rewrite ^/minio/(.*)$ /$1 break;
+            proxy_pass ${DOLLAR}minio_s3_upstream;
+
+            # Preserve original host header for S3 signature validation
+            proxy_set_header Host $host;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+
+        # Beacon Library under /library
+        location = /library {
+            return 301 /library/;
+        }
+
+        location /library/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            # Standard proxy headers (NOT including proxy_headers.conf to avoid Connection override)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            proxy_set_header X-Script-Name /library;
+            proxy_set_header X-Forwarded-Prefix /library;
+
+            rewrite ^/library/(.*)$ /$1 break;
+            proxy_pass ${DOLLAR}beacon_library_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_cache_bypass $http_upgrade;
+
+            # Extended timeouts for WebSocket connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support for Vite HMR (MUST come after other proxy_set_header directives)
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+
+        # Technitium DNS Admin under /DNS
+        location = /DNS {
+            return 301 /DNS/;
+        }
+
+        location /DNS/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_set_header X-Script-Name /DNS;
+            proxy_set_header X-Forwarded-Prefix /DNS;
+
+            rewrite ^/DNS/(.*)$ /$1 break;
+            proxy_pass ${DOLLAR}technitium_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support (if used by Technitium UI)
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+
+        # Root SPA (served from /usr/share/nginx/html)
         location / {
+            root /usr/share/nginx/html;
+            try_files ${DOLLAR}uri ${DOLLAR}uri/ /index.html;
+        }
+    }
+
+    # ===========================================
+    # VectorDB pgAdmin HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name beacon.famillelallier.vectordb;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Redirect root to pgAdmin prefix
+        location = / {
+            return 301 /pgadmin/;
+        }
+
+        # PgAdmin under /pgadmin
+        location /pgadmin/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
             include /etc/nginx/conf.d/proxy_headers.conf;
-            proxy_pass ${DOLLAR}web_upstream;
+            proxy_set_header X-Script-Name /pgadmin;
+            proxy_set_header X-Forwarded-Prefix /pgadmin;
+
+            proxy_pass ${DOLLAR}pgadmin_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
         }
     }
 }
