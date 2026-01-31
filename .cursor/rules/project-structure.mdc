@@ -1,0 +1,15 @@
+---
+description: Project structure conventions for Beacon
+alwaysApply: true
+---
+
+# Project Structure
+
+Keep the repository organized into these top-level directories:
+
+- `applications/`: Application source code (e.g., `Library/`).
+- `infra/`: Infrastructure and runtime components (compose, Docker, monitoring, ingress, certs).
+- `config/`: Tooling and project configuration (env, linters, editor config, Makefile).
+- `docs/`: Project documentation.
+
+When moving or adding files, place them under the appropriate directory and update references as needed.

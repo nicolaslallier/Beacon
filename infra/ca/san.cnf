@@ -1,0 +1,26 @@
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = beacon-library.famillelallier.net
+DNS.2 = grafana.beacon.famillelallier.net
+DNS.3 = prometheus.beacon.famillelallier.net
+DNS.4 = loki.beacon.famillelallier.net
+DNS.5 = tempo.beacon.famillelallier.net
+DNS.6 = minio.beacon.famillelallier.net
+DNS.7 = s3.beacon.famillelallier.net
+DNS.8 = keycloak.beacon.famillelallier.net
+DNS.9 = mcp-vector.beacon.famillelallier.net
+DNS.10 = ollama.beacon.famillelallier.net
+DNS.11 = localhost
+IP.1 = 127.0.0.1
+IP.2 = 192.168.2.35
+

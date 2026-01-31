@@ -1,0 +1,916 @@
+user  nginx;
+worker_processes  auto;
+
+error_log  /dev/stderr warn;
+pid        /var/run/nginx.pid;
+
+# Main events block
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    # Docker DNS resolver for dynamic upstream resolution
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent $request_time "$http_referer" "$http_user_agent" "$http_x_forwarded_for" $upstream_addr $upstream_response_time';
+    access_log /dev/stdout main;
+
+    # Compression
+    gzip ${GZIP_ENABLED};
+    gzip_types application/json application/javascript text/css text/plain;
+
+    # Set maximum client body size
+    client_max_body_size ${MAX_BODY_SIZE};
+
+    # Increase hash sizes for proxy headers (needed with many upstreams)
+    proxy_headers_hash_max_size 1024;
+    proxy_headers_hash_bucket_size 128;
+
+    server_tokens off;
+
+    # Map for API upstream
+    map "" ${DOLLAR}api_upstream {
+        default http://${UPSTREAM_API_HOST}:${UPSTREAM_API_PORT};
+    }
+
+    # Map for Web upstream
+    map "" ${DOLLAR}web_upstream {
+        default http://${UPSTREAM_WEB_HOST}:${UPSTREAM_WEB_PORT};
+    }
+
+    # Map for Grafana upstream
+    map "" ${DOLLAR}grafana_upstream {
+        default http://${UPSTREAM_GRAFANA_HOST}:${UPSTREAM_GRAFANA_PORT};
+    }
+
+    # Map for Prometheus upstream
+    map "" ${DOLLAR}prometheus_upstream {
+        default http://${UPSTREAM_PROMETHEUS_HOST}:${UPSTREAM_PROMETHEUS_PORT};
+    }
+
+    # Map for Loki upstream
+    map "" ${DOLLAR}loki_upstream {
+        default http://${UPSTREAM_LOKI_HOST}:${UPSTREAM_LOKI_PORT};
+    }
+
+    # Map for Tempo upstream
+    map "" ${DOLLAR}tempo_upstream {
+        default http://${UPSTREAM_TEMPO_HOST}:${UPSTREAM_TEMPO_PORT};
+    }
+
+    # Map for MinIO Console upstream
+    map "" ${DOLLAR}minio_console_upstream {
+        default http://${UPSTREAM_MINIO_CONSOLE_HOST}:${UPSTREAM_MINIO_CONSOLE_PORT};
+    }
+
+    # Map for MinIO S3 API upstream
+    map "" ${DOLLAR}minio_s3_upstream {
+        default http://${UPSTREAM_MINIO_S3_HOST}:${UPSTREAM_MINIO_S3_PORT};
+    }
+
+    # Map for Beacon Library upstream
+    map "" ${DOLLAR}beacon_library_upstream {
+        default http://${UPSTREAM_BEACON_LIBRARY_HOST}:${UPSTREAM_BEACON_LIBRARY_PORT};
+    }
+
+    # Map for Toolsuite upstream
+    map "" ${DOLLAR}toolsuite_upstream {
+        default http://${UPSTREAM_TOOLSUITE_HOST}:${UPSTREAM_TOOLSUITE_PORT};
+    }
+
+    # Map for Toolsuite API upstream
+    map "" ${DOLLAR}toolsuite_api_upstream {
+        default http://${UPSTREAM_TOOLSUITE_API_HOST}:${UPSTREAM_TOOLSUITE_API_PORT};
+    }
+
+    # Map for MCP Vector upstream
+    map "" ${DOLLAR}mcp_vector_upstream {
+        default http://${UPSTREAM_MCP_VECTOR_HOST}:${UPSTREAM_MCP_VECTOR_PORT};
+    }
+
+    # Map for API Gateway upstream (Traefik)
+    map "" ${DOLLAR}beacon_gateway_upstream {
+        default http://${UPSTREAM_GATEWAY_HOST}:${UPSTREAM_GATEWAY_PORT};
+    }
+
+    # Map for ChromaDB Admin upstream (Beacon Library network)
+    map "" ${DOLLAR}chromadb_admin_upstream {
+        default http://${UPSTREAM_CHROMADB_ADMIN_HOST}:${UPSTREAM_CHROMADB_ADMIN_PORT};
+    }
+
+    # Map for ChromaDB upstream (Beacon Library network)
+    map "" ${DOLLAR}chromadb_upstream {
+        default http://${UPSTREAM_CHROMADB_HOST}:${UPSTREAM_CHROMADB_PORT};
+    }
+
+    # Map for Ollama upstream (Beacon Library network)
+    map "" ${DOLLAR}ollama_upstream {
+        default http://${UPSTREAM_OLLAMA_HOST}:${UPSTREAM_OLLAMA_PORT};
+    }
+
+
+    # Map for Keycloak upstream
+    map "" ${DOLLAR}keycloak_upstream {
+        default http://${UPSTREAM_KEYCLOAK_HOST}:${UPSTREAM_KEYCLOAK_PORT};
+    }
+
+    # Map for n8n upstream
+    map "" ${DOLLAR}n8n_upstream {
+        default http://${UPSTREAM_N8N_HOST}:${UPSTREAM_N8N_PORT};
+    }
+
+    # Map for WebSocket connection upgrade
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    # ===========================================
+    # HTTP to HTTPS redirect (when SSL enabled)
+    # ===========================================
+    server {
+        listen 80 default_server;
+        server_name _;
+
+        # Health endpoint (always available on HTTP)
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # ACME challenge for Let's Encrypt
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        # Redirect all other HTTP traffic to HTTPS
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # ===========================================
+    # Beacon Library HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name beacon-library.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # OAuth2 proxy endpoints
+        location /oauth2/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
+            proxy_buffering off;
+            proxy_redirect off;
+            
+            # Large buffer sizes for OAuth2 tokens (JWT can be large)
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+        }
+
+        # API gateway entry point
+        location /api/ {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
+            proxy_buffering off;
+            proxy_redirect off;
+        }
+
+        # MCP SSE endpoint - must use HTTP/1.1 for Server-Sent Events
+        location /api/mcp/sse {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            proxy_pass ${DOLLAR}beacon_gateway_upstream;
+            
+            # Critical SSE settings
+            proxy_http_version 1.1;
+            proxy_set_header Connection '';
+            proxy_buffering off;
+            proxy_cache off;
+            
+            # Long timeout for SSE connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+            
+            # Chunked transfer encoding support
+            chunked_transfer_encoding on;
+        }
+
+        # Beacon Library proxy - using variable for runtime DNS resolution
+        location / {
+            auth_request /oauth2/auth;
+            error_page 401 = /oauth2/sign_in;
+
+            # Standard proxy headers (NOT including proxy_headers.conf to avoid Connection override)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            proxy_pass ${DOLLAR}beacon_library_upstream;
+            
+            # Beacon Library-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_cache_bypass $http_upgrade;
+            
+            # Extended timeouts for WebSocket connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+            proxy_connect_timeout 75s;
+            
+            # WebSocket support for Vite HMR (MUST come after other proxy_set_header directives)
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # Toolsuite HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name toolsuite.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Toolsuite proxy - using variable for runtime DNS resolution
+        location / {
+            # Standard proxy headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+
+            proxy_pass ${DOLLAR}toolsuite_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support for Streamlit
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # ChromaDB Admin HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name chromadbadmin.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # ChromaDB Admin proxy
+        location / {
+            # Standard proxy headers (NOT including proxy_headers.conf to avoid Connection override)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+
+            proxy_pass ${DOLLAR}chromadb_admin_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_cache_bypass $http_upgrade;
+
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support (safe even if unused)
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # ChromaDB HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name chromadb.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # ChromaDB proxy (HTTP API)
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}chromadb_upstream;
+
+            proxy_buffering off;
+            proxy_redirect off;
+
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # MinIO Console HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name minio.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # MinIO Console proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}minio_console_upstream;
+            
+            # MinIO Console-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+            
+            # WebSocket support for MinIO Console
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # MinIO S3 API HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name s3.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # MinIO S3 API proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}minio_s3_upstream;
+            
+            # S3 API-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+            
+            # Preserve original host header for S3 signature validation
+            proxy_set_header Host $host;
+        }
+    }
+
+    # ===========================================
+    # Grafana HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name grafana.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Grafana proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}grafana_upstream;
+            
+            # Grafana-specific proxy settings
+            proxy_set_header X-WEBAUTH-USER $remote_user;
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # Prometheus HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name prometheus.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Prometheus proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}prometheus_upstream;
+            
+            # Prometheus-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # Loki HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name loki.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Loki proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}loki_upstream;
+            
+            # Loki-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # Tempo HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name tempo.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Tempo proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}tempo_upstream;
+            
+            # Tempo-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # MCP Vector Server HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name mcp-vector.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # MCP SSE endpoint - must use HTTP/1.1 for Server-Sent Events
+        location /mcp/sse {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            proxy_pass ${DOLLAR}mcp_vector_upstream/mcp/sse;
+            
+            # Critical SSE settings
+            proxy_http_version 1.1;
+            proxy_set_header Connection '';
+            proxy_buffering off;
+            proxy_cache off;
+            
+            # Long timeout for SSE connections
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+            
+            # Chunked transfer encoding support
+            chunked_transfer_encoding on;
+        }
+
+        # MCP Vector Server proxy
+        location / {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            proxy_pass ${DOLLAR}mcp_vector_upstream;
+            
+            proxy_buffering off;
+            proxy_redirect off;
+            
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # Ollama HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name ollama.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Ollama API proxy
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}ollama_upstream;
+
+            # Streaming responses from Ollama should not buffer
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+    }
+
+    # ===========================================
+    # Keycloak HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name keycloak.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Keycloak proxy - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}keycloak_upstream;
+            
+            # Keycloak-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+            
+            # Required headers for Keycloak behind reverse proxy
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port 443;
+            
+            # Large buffer sizes for Keycloak (SAML/OIDC tokens can be large)
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+        }
+    }
+
+    # ===========================================
+    # n8n HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name n8n.beacon.famillelallier.net;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # n8n proxy
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}n8n_upstream;
+
+            # n8n-specific proxy settings
+            proxy_buffering off;
+            proxy_redirect off;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+
+            # WebSocket support (n8n UI)
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+        }
+    }
+
+    # ===========================================
+    # Default HTTPS server block
+    # ===========================================
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name _;
+
+        # SSL certificates
+        ssl_certificate ${SSL_CERT_PATH};
+        ssl_certificate_key ${SSL_KEY_PATH};
+        include /etc/nginx/conf.d/ssl.conf;
+
+        # Health endpoint
+        location = /healthz {
+            return 200 'OK\n';
+            add_header Content-Type text/plain;
+        }
+
+        # Block access to sensitive files
+        location ~* ^/(.git|.env) {
+            deny all;
+            return 404;
+        }
+
+        # Error page
+        error_page 502 504 /502.html;
+        location = /502.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+
+        # API route - using variable for runtime DNS resolution
+        location /api/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}api_upstream;
+        }
+
+        # Toolsuite SPA (served from /usr/share/nginx/html/toolsuite)
+        location = /toolsuite {
+            return 301 /toolsuite/;
+        }
+
+        location /toolsuite/ {
+            root /usr/share/nginx/html;
+            try_files ${DOLLAR}uri ${DOLLAR}uri/ /toolsuite/index.html;
+        }
+
+        # Toolsuite API (strip /toolsuite-api prefix)
+        location = /toolsuite-api {
+            return 301 /toolsuite-api/;
+        }
+
+        location /toolsuite-api/ {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}toolsuite_api_upstream/;
+        }
+
+        # Frontend/static - using variable for runtime DNS resolution
+        location / {
+            include /etc/nginx/conf.d/proxy_headers.conf;
+            proxy_pass ${DOLLAR}web_upstream;
+        }
+    }
+}
