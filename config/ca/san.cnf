@@ -19,7 +19,11 @@ DNS.6 = minio.beacon.famillelallier.net
 DNS.7 = s3.beacon.famillelallier.net
 DNS.8 = keycloak.beacon.famillelallier.net
 DNS.9 = mcp-vector.beacon.famillelallier.net
-DNS.10 = localhost
+DNS.10 = postgresql.beacon.famillelallier.net
+DNS.11 = redis.beacon.famillelallier.net
+DNS.12 = supabase.beacon.famillelallier.net
+DNS.13 = chromadb.beacon.famillelallier.net
+DNS.14 = localhost
 IP.1 = 127.0.0.1
 IP.2 = 192.168.2.35
 

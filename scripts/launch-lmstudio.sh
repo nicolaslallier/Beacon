@@ -8,7 +8,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-CA_CERT="$PROJECT_DIR/ca/beacon-ca.crt"
+CA_CERT="$PROJECT_DIR/config/ca/beacon-ca.crt"
 
 if [ ! -f "$CA_CERT" ]; then
     echo "❌ CA certificate not found: $CA_CERT"

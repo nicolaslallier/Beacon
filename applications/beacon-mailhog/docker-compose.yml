@@ -1,0 +1,56 @@
+services:
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: beacon-mailhog
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    expose:
+      - "${MAILHOG_SMTP_PORT:-1025}"
+      - "${MAILHOG_UI_PORT:-8025}"
+    networks:
+      - mailhog_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8025 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mailhog-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-mailhog-nginx
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - MAILHOG_SERVER_NAME=${MAILHOG_SERVER_NAME:-mailhog.beacon.famillelallier.net}
+      - MAILHOG_UI_UPSTREAM_HOST=${MAILHOG_UI_UPSTREAM_HOST:-mailhog}
+      - MAILHOG_UI_UPSTREAM_PORT=${MAILHOG_UI_UPSTREAM_PORT:-8025}
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+    dns_search:
+      - ${TECHNITIUM_DNS_SEARCH:-famillelallier.net}
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      mailhog:
+        condition: service_healthy
+    networks:
+      - mailhog_net
+      - nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  mailhog_net:
+    name: beacon_mailhog_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

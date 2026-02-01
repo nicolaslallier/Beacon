@@ -1,0 +1,57 @@
+:80 {
+  # Static landing page (disable caching to avoid stale UI)
+  header Cache-Control "no-store"
+
+  respond /healthz "OK\n" 200
+
+  handle_path /_health/n8n {
+    reverse_proxy n8n-nginx:80/healthz
+  }
+
+  handle_path /_health/pgadmin {
+    reverse_proxy pgadmin:80/misc/ping
+  }
+
+  handle_path /_health/grafana {
+    reverse_proxy grafana-nginx:80/healthz
+  }
+
+  handle_path /_health/keycloak {
+    reverse_proxy keycloak:8080/health/ready
+  }
+
+  handle_path /_health/dns {
+    reverse_proxy technitium-dns:5380/
+  }
+
+  handle_path /_health/minio {
+    reverse_proxy minio1:9000/minio/health/live
+  }
+
+  handle_path /_health/redis {
+    reverse_proxy redis-nginx:80/healthz
+  }
+
+  handle_path /_health/supabase {
+    reverse_proxy supabase-nginx:80/healthz
+  }
+
+  handle_path /_health/chromadb {
+    reverse_proxy chromadb-nginx:80/healthz
+  }
+
+  handle_path /_health/postgresql {
+    reverse_proxy postgresql-nginx:80/healthz
+  }
+
+  handle_path /_health/beacon-ollama {
+    reverse_proxy beacon-ollama-nginx:80/healthz-beacon-ollama
+  }
+
+  handle_path /_health/beacon-ollama-webui {
+    reverse_proxy beacon-ollama-nginx:80/healthz-beacon-ollama-webui
+  }
+
+  root * /usr/share/caddy
+  file_server
+}

@@ -1,99 +1,453 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Beacon</title>
-    <style>
-      :root {
-        color-scheme: light dark;
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beacon</title>
+  <style>
+    :root {
+      --border:#e5e7eb;
+      --bg:#fafafa;
+      --text:#111827;
+      --muted:#6b7280;
+      --card:#ffffff;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 18px 22px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 18px; }
+    .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .wrap { padding: 18px 22px; max-width: 980px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .name {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      line-height: 1.2;
+    }
+    .status {
+      font-size: 18px;
+      line-height: 1;
+    }
+    .url {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid #111827;
+      color: #111827;
+      text-decoration: none;
+      font-weight: 700;
+      background: #fff;
+    }
+    a.btn:hover { opacity: 0.9; }
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+    .legend {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #fff;
+    }
+    code { background:#f3f4f6; padding:2px 6px; border-radius:8px; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Beacon — Quick Access</h1>
+    <div class="meta">
+      Boutons → nouvel onglet. Statut → vérifié via endpoints same-origin
+      <code>/_health/*</code> (pas de CORS).
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+
+      <!-- n8n -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-n8n" class="status" title="Checking…">⚪</span>
+              <span>n8n</span>
+            </div>
+            <div class="url">https://n8n.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://n8n.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir n8n ↗
+        </a>
+
+        <div class="small">Health: <span id="health-n8n">checking…</span></div>
+      </div>
+
+      <!-- pgAdmin -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-pgadmin" class="status" title="Up">🟢</span>
+              <span>pgAdmin</span>
+            </div>
+            <div class="url">https://pgadmin.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://pgadmin.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir pgAdmin ↗
+        </a>
+
+        <div class="small">Health: <span id="health-pgadmin">OK</span></div>
+      </div>
+
+      <!-- Grafana -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-grafana" class="status" title="Checking…">⚪</span>
+              <span>Grafana</span>
+            </div>
+            <div class="url">https://grafana.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://grafana.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Grafana ↗
+        </a>
+
+        <div class="small">Health: <span id="health-grafana">checking…</span></div>
+      </div>
+
+      <!-- Keycloak -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-keycloak" class="status" title="Checking…">⚪</span>
+              <span>Keycloak</span>
+            </div>
+            <div class="url">https://keycloak.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://keycloak.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Keycloak ↗
+        </a>
+
+        <div class="small">Health: <span id="health-keycloak">checking…</span></div>
+      </div>
+
+      <!-- DNS -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-dns" class="status" title="Checking…">⚪</span>
+              <span>Technitium DNS</span>
+            </div>
+            <div class="url">http://beacon.famillelallier.net:5380/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="http://beacon.famillelallier.net:5380/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir DNS ↗
+        </a>
+
+        <div class="small">Health: <span id="health-dns">checking…</span></div>
+      </div>
+
+      <!-- MinIO -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-minio" class="status" title="Checking…">⚪</span>
+              <span>MinIO</span>
+            </div>
+            <div class="url">https://minio.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://minio.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir MinIO ↗
+        </a>
+
+        <div class="small">Health: <span id="health-minio">checking…</span></div>
+      </div>
+
+      <!-- PostgreSQL -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-postgresql" class="status" title="Checking…">⚪</span>
+              <span>PostgreSQL</span>
+            </div>
+            <div class="url">postgresql.beacon.famillelallier.net:5432</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://postgresql.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir PostgreSQL ↗
+        </a>
+
+        <div class="small">Health: <span id="health-postgresql">checking…</span></div>
+      </div>
+
+      <!-- Redis -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-redis" class="status" title="Checking…">⚪</span>
+              <span>Redis</span>
+            </div>
+            <div class="url">https://redis.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://redis.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Redis GUI ↗
+        </a>
+
+        <div class="small">Health: <span id="health-redis">checking…</span></div>
+      </div>
+
+      <!-- Supabase -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-supabase" class="status" title="Checking…">⚪</span>
+              <span>Supabase</span>
+            </div>
+            <div class="url">https://supabase.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://supabase.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Supabase ↗
+        </a>
+
+        <div class="small">Health: <span id="health-supabase">checking…</span></div>
+      </div>
+
+      <!-- ChromaDB -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-chromadb" class="status" title="Checking…">⚪</span>
+              <span>ChromaDB</span>
+            </div>
+            <div class="url">https://chromadb.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://chromadb.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir ChromaDB ↗
+        </a>
+
+        <div class="small">Health: <span id="health-chromadb">checking…</span></div>
+      </div>
+
+      <!-- Beacon Ollama -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-beacon-ollama" class="status" title="Checking…">⚪</span>
+              <span>Beacon Ollama</span>
+            </div>
+            <div class="url">https://beacon-ollama.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://beacon-ollama.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Beacon Ollama ↗
+        </a>
+
+        <div class="small">Health: <span id="health-beacon-ollama">checking…</span></div>
+      </div>
+
+      <!-- Beacon Ollama WebUI -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-beacon-ollama-webui" class="status" title="Checking…">⚪</span>
+              <span>Beacon Ollama WebUI</span>
+            </div>
+            <div class="url">https://beacon.famillelallier.net/beacon-ollama-webui/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://beacon.famillelallier.net/beacon-ollama-webui/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Beacon Ollama WebUI ↗
+        </a>
+
+        <div class="small">Health: <span id="health-beacon-ollama-webui">checking…</span></div>
+      </div>
+
+    </div>
+
+    <div class="legend">
+      <div class="pill">🟢 Up (HTTP 200/204)</div>
+      <div class="pill">🔴 Down / unreachable</div>
+      <div class="pill">⚪ Checking…</div>
+      <div class="pill">Refresh: every 10s</div>
+    </div>
+  </div>
+
+  <script>
+    // IMPORTANT:
+    // These health URLs are SAME-ORIGIN (beacon.famillelallier.net),
+    // and are proxied by NGINX to the containers to avoid CORS.
+    const services = [
+      { key: "n8n", healthUrl: "/_health/n8n", okStatuses: new Set([200, 204]) },
+      { key: "pgadmin", healthUrl: "/_health/pgadmin", okStatuses: new Set([200, 204]) },
+      { key: "grafana", healthUrl: "/_health/grafana", okStatuses: new Set([200, 204, 302]) },
+      { key: "keycloak", healthUrl: "/_health/keycloak", okStatuses: new Set([200, 204]) },
+      { key: "dns", healthUrl: "/_health/dns", okStatuses: new Set([200, 204, 302]) },
+      { key: "minio", healthUrl: "/_health/minio", okStatuses: new Set([200, 204]) },
+      { key: "postgresql", healthUrl: "/_health/postgresql", okStatuses: new Set([200, 204]) },
+      { key: "redis", healthUrl: "/_health/redis", okStatuses: new Set([200, 204]) },
+      { key: "supabase", healthUrl: "/_health/supabase", okStatuses: new Set([200, 204]) },
+      { key: "chromadb", healthUrl: "/_health/chromadb", okStatuses: new Set([200, 204]) },
+      { key: "beacon-ollama", healthUrl: "/_health/beacon-ollama", okStatuses: new Set([200, 204]) },
+      { key: "beacon-ollama-webui", healthUrl: "/_health/beacon-ollama-webui", okStatuses: new Set([200, 204]) }
+    ];
+
+    function setStatus(key, state, detail) {
+      const icon = document.getElementById(`status-${key}`);
+      const txt  = document.getElementById(`health-${key}`);
+      if (!icon || !txt) return;
+
+      if (state === "up") {
+        icon.textContent = "🟢";
+        icon.title = "Up";
+        txt.textContent = detail || "OK";
+      } else if (state === "down") {
+        icon.textContent = "🔴";
+        icon.title = "Down";
+        txt.textContent = detail || "DOWN";
+      } else {
+        icon.textContent = "⚪";
+        icon.title = "Checking…";
+        txt.textContent = "checking…";
       }
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0b0f17;
-        color: #f5f7fb;
+    }
+
+    async function checkOne(svc) {
+      setStatus(svc.key, "checking");
+
+      try {
+        const res = await fetch(svc.healthUrl, { method: "GET", cache: "no-store" });
+
+        if (svc.okStatuses.has(res.status)) {
+          setStatus(svc.key, "up", `HTTP ${res.status}`);
+        } else {
+          setStatus(svc.key, "down", `HTTP ${res.status}`);
+        }
+      } catch (e) {
+        setStatus(svc.key, "down", "unreachable");
       }
-      main {
-        max-width: 720px;
-        margin: 64px auto;
-        padding: 0 24px;
-      }
-      h1 {
-        font-size: 28px;
-        margin-bottom: 12px;
-      }
-      p {
-        margin-top: 0;
-        opacity: 0.8;
-      }
-      nav {
-        margin-top: 32px;
-        background: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 12px;
-        padding: 16px 20px;
-      }
-      nav a {
-        color: #93c5fd;
-        text-decoration: none;
-        font-weight: 600;
-      }
-      nav a:hover {
-        text-decoration: underline;
-      }
-      ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-      }
-      li + li {
-        margin-top: 12px;
-      }
-      .badge {
-        display: inline-block;
-        font-size: 12px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: #1f2937;
-        color: #9ca3af;
-        margin-left: 8px;
-        vertical-align: middle;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Beacon</h1>
-      <p>Welcome to the Beacon gateway.</p>
-      <nav aria-label="Primary">
-        <ul>
-          <li>
-            <a href="/pgadmin/">PgAdmin</a>
-            <span class="badge">Database Admin</span>
-          </li>
-          <li>
-            <a href="/vectordb/">VectorDB</a>
-            <span class="badge">Database Admin</span>
-          </li>
-          <li>
-            <a href="/grafana/">Grafana</a>
-            <span class="badge">Monitoring</span>
-          </li>
-          <li>
-            <a href="/minio/">MinIO</a>
-            <span class="badge">Object Storage</span>
-          </li>
-          <li>
-            <a href="/library/">Library</a>
-            <span class="badge">Document Manager</span>
-          </li>
-          <li>
-            <a href="/DNS/">DNS</a>
-            <span class="badge">Admin</span>
-          </li>
-        </ul>
-      </nav>
-    </main>
-  </body>
+    }
+
+    async function checkAll() {
+      await Promise.all(services.map(checkOne));
+    }
+
+    // initial + every 10s
+    checkAll();
+    setInterval(checkAll, 10000);
+  </script>
+</body>
 </html>

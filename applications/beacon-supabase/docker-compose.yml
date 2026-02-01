@@ -1,0 +1,266 @@
+services:
+  db:
+    image: supabase/postgres:15.14.1.079
+    container_name: beacon-supabase-db
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+      - POSTGRES_DB=postgres
+      - JWT_SECRET=${JWT_SECRET:-change_me}
+      - RLIMIT_NOFILE=${RLIMIT_NOFILE:-1048576}
+    volumes:
+      - supabase_db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - supabase_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  kong:
+    image: kong:2.8.1
+    container_name: beacon-supabase-kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_NGINX_WORKER_PROCESSES: 1
+      KONG_DNS_ORDER: LAST,A,CNAME
+    expose:
+      - "8000"
+    volumes:
+      - ./kong/kong.yml:/etc/kong/kong.yml:ro
+    networks:
+      - supabase_net
+      - nginx_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  auth:
+    image: supabase/gotrue:v2.186.0
+    container_name: beacon-supabase-auth
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - GOTRUE_SITE_URL=${SITE_URL:-https://supabase.beacon.famillelallier.net}
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_DB_DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-change_me}@db:5432/postgres
+      - GOTRUE_JWT_SECRET=${JWT_SECRET:-change_me}
+      - GOTRUE_JWT_AUD=authenticated
+      - GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
+      - GOTRUE_JWT_EXP=3600
+      - GOTRUE_EXTERNAL_EMAIL_ENABLED=true
+      - GOTRUE_DISABLE_SIGNUP=false
+      - GOTRUE_MAILER_AUTOCONFIRM=true
+      - GOTRUE_SMTP_ADMIN_EMAIL=${SMTP_ADMIN_EMAIL:-admin@beacon.local}
+      - GOTRUE_SMTP_HOST=${SMTP_HOST:-mailhog}
+      - GOTRUE_SMTP_PORT=${SMTP_PORT:-1025}
+      - GOTRUE_SMTP_USER=${SMTP_USER:-}
+      - GOTRUE_SMTP_PASS=${SMTP_PASS:-}
+      - GOTRUE_SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-Beacon}
+    expose:
+      - "9999"
+    networks:
+      - supabase_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  rest:
+    image: postgrest/postgrest:v14.4
+    container_name: beacon-supabase-rest
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - PGRST_DB_URI=postgres://postgres:${POSTGRES_PASSWORD:-change_me}@db:5432/postgres
+      - PGRST_DB_SCHEMA=public
+      - PGRST_DB_ANON_ROLE=anon
+      - PGRST_JWT_SECRET=${JWT_SECRET:-change_me}
+    expose:
+      - "3000"
+    networks:
+      - supabase_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  realtime:
+    image: supabase/realtime:v2.73.5
+    container_name: beacon-supabase-realtime
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - PORT=4000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+      - DB_NAME=postgres
+      - JWT_SECRET=${JWT_SECRET:-change_me}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-change_me_change_me_change_me_change_me}
+      - APP_NAME=supabase-realtime
+    expose:
+      - "4000"
+    networks:
+      - supabase_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  storage:
+    image: supabase/storage-api:v1.36.0
+    container_name: beacon-supabase-storage
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - ANON_KEY=${ANON_KEY:-change_me}
+      - SERVICE_KEY=${SERVICE_ROLE_KEY:-change_me}
+      - POSTGREST_URL=http://rest:3000
+      - PGRST_JWT_SECRET=${JWT_SECRET:-change_me}
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-change_me}@db:5432/postgres
+      - FILE_SIZE_LIMIT=52428800
+      - STORAGE_BACKEND=file
+      - FILE_STORAGE_PATH=/var/lib/storage
+      - FILE_STORAGE_BACKEND_PATH=/var/lib/storage
+    volumes:
+      - supabase_storage-data:/var/lib/storage
+    expose:
+      - "5000"
+    networks:
+      - supabase_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  imgproxy:
+    image: ghcr.io/supabase/imgproxy:v1.2.0
+    container_name: beacon-supabase-imgproxy
+    restart: unless-stopped
+    environment:
+      - IMGPROXY_BIND=0.0.0.0:5001
+      - IMGPROXY_USE_ETAG=true
+      - IMGPROXY_ENABLE_WEBP_DETECTION=true
+    expose:
+      - "5001"
+    networks:
+      - supabase_net
+
+  meta:
+    image: supabase/postgres-meta:v0.95.2
+    container_name: beacon-supabase-meta
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - PG_META_DB_HOST=db
+      - PG_META_DB_PORT=5432
+      - PG_META_DB_NAME=postgres
+      - PG_META_DB_USER=postgres
+      - PG_META_DB_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+    expose:
+      - "8080"
+    networks:
+      - supabase_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  studio:
+    image: supabase/studio:2026.01.27-sha-2a37755
+    container_name: beacon-supabase-studio
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - STUDIO_PG_META_URL=http://meta:8080
+      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_ANON_KEY=${ANON_KEY:-change_me}
+      - SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY:-change_me}
+      - STUDIO_DEFAULT_ORGANIZATION=${STUDIO_DEFAULT_ORGANIZATION:-Beacon}
+      - STUDIO_DEFAULT_PROJECT=${STUDIO_DEFAULT_PROJECT:-Beacon}
+    expose:
+      - "3000"
+    networks:
+      - supabase_net
+    depends_on:
+      - meta
+
+  edge-runtime:
+    image: supabase/edge-runtime:v1.70.0
+    container_name: beacon-supabase-edge-runtime
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_ANON_KEY=${ANON_KEY:-change_me}
+      - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY:-change_me}
+      - JWT_SECRET=${JWT_SECRET:-change_me}
+    volumes:
+      - ./functions:/home/deno/functions
+    expose:
+      - "9000"
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+      - --port
+      - "9000"
+    networks:
+      - supabase_net
+    depends_on:
+      - kong
+
+  supabase-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-supabase-nginx
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - SUPABASE_SERVER_NAME=${SUPABASE_SERVER_NAME:-supabase.beacon.famillelallier.net}
+      - SUPABASE_UPSTREAM_HOST=${SUPABASE_UPSTREAM_HOST:-kong}
+      - SUPABASE_UPSTREAM_PORT=${SUPABASE_UPSTREAM_PORT:-8000}
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - supabase_net
+      - nginx_net
+    depends_on:
+      - kong
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  supabase_db-data:
+    name: beacon_supabase_db-data
+  supabase_storage-data:
+    name: beacon_supabase_storage-data
+
+networks:
+  supabase_net:
+    name: beacon_supabase_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

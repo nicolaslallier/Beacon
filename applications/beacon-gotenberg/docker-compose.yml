@@ -1,0 +1,55 @@
+services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: beacon-gotenberg
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    expose:
+      - "3000"
+    networks:
+      - gotenberg_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  gotenberg-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-gotenberg-nginx
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - GOTENBERG_SERVER_NAME=${GOTENBERG_SERVER_NAME:-gotenberg.beacon.famillelallier.net}
+      - GOTENBERG_UPSTREAM_HOST=${GOTENBERG_UPSTREAM_HOST:-gotenberg}
+      - GOTENBERG_UPSTREAM_PORT=${GOTENBERG_UPSTREAM_PORT:-3000}
+      - DOLLAR=$$
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+    dns_search:
+      - ${TECHNITIUM_DNS_SEARCH:-famillelallier.net}
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      gotenberg:
+        condition: service_healthy
+    networks:
+      - gotenberg_net
+      - nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  gotenberg_net:
+    name: beacon_gotenberg_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

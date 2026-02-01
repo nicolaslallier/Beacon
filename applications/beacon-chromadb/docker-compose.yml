@@ -1,0 +1,57 @@
+services:
+  chromadb:
+    image: chromadb/chroma:0.5.5
+    container_name: beacon-chromadb
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=${CHROMADB_PORT:-8000}
+    volumes:
+      - beacon_chromadb-data:/chroma/chroma
+    networks:
+      - chromadb_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  chromadb-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-chromadb-nginx
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - CHROMADB_SERVER_NAME=${CHROMADB_SERVER_NAME:-chromadb.beacon.famillelallier.net}
+      - CHROMADB_UPSTREAM_HOST=${CHROMADB_UPSTREAM_HOST:-chromadb}
+      - CHROMADB_UPSTREAM_PORT=${CHROMADB_UPSTREAM_PORT:-8000}
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    networks:
+      - chromadb_net
+      - nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  beacon_chromadb-data:
+    name: beacon_chromadb-data
+
+networks:
+  chromadb_net:
+    name: beacon_chromadb_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

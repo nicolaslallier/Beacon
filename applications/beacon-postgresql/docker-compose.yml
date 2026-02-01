@@ -1,0 +1,68 @@
+services:
+  postgresql:
+    image: postgres:17-alpine
+    container_name: beacon-postgresql
+    restart: unless-stopped
+    user: "postgres"
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-beacon}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-beacon}
+      - POSTGRES_DB=${POSTGRES_DB:-beacon}
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /var/lib/postgresql/certs
+        cp /certs/privkey.pem /var/lib/postgresql/certs/privkey.pem
+        cp /certs/fullchain.pem /var/lib/postgresql/certs/fullchain.pem
+        chmod 600 /var/lib/postgresql/certs/privkey.pem
+        chown postgres:postgres /var/lib/postgresql/certs/privkey.pem /var/lib/postgresql/certs/fullchain.pem
+        exec postgres -c ssl=on \
+          -c ssl_cert_file=/var/lib/postgresql/certs/fullchain.pem \
+          -c ssl_key_file=/var/lib/postgresql/certs/privkey.pem
+    volumes:
+      - beacon_postgresql-data:/var/lib/postgresql/data
+      - ${SSL_CERTS_PATH:-../../config/certs}:/certs:ro
+    networks:
+      - postgresql_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beacon} -d ${POSTGRES_DB:-beacon}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  postgresql-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-postgresql-nginx
+    restart: unless-stopped
+    expose:
+      - "80"
+      - "5432"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    networks:
+      - nginx_net
+      - postgresql_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  beacon_postgresql-data:
+    name: beacon_postgresql-data
+
+networks:
+  postgresql_net:
+    name: beacon_postgresql_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

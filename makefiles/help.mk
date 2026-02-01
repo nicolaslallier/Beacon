@@ -9,71 +9,92 @@ endef
 
 help:
 	@printf "\n=== CI/CD Makefile (Beacon) ===\n\n"
-	@printf "## Dev/Build\n"
-	$(call help_line,docker-build,Construit l'image Docker)
-	@printf "\n## Quality\n"
-	$(call help_line,lint,Lint global (Dockerfile, shell, nginx))
-	$(call help_line,lint-docker,Lint du Dockerfile (hadolint))
-	$(call help_line,lint-shell,Lint des scripts shell (shellcheck))
-	$(call help_line,lint-nginx,Test la conf NGINX)
-	@printf "\n## Docker Compose\n"
-	$(call help_line,up,Demarre tous les services (nginx + monitoring + auth))
-	$(call help_line,up-core,Demarre uniquement nginx)
-	$(call help_line,up-monitoring,Demarre nginx + monitoring)
-	$(call help_line,up-auth,Demarre nginx + auth (Keycloak))
-	$(call help_line,up-monitoring-only,Seulement la stack monitoring)
-	$(call help_line,up-auth-only,Seulement Keycloak + DB)
-	$(call help_line,down,Stoppe tous les services)
-	$(call help_line,down-monitoring,Arrete tout avec monitoring)
-	$(call help_line,down-auth,Arrete tout avec auth)
-	$(call help_line,down-monitoring-only,Stoppe uniquement la stack monitoring)
-	$(call help_line,down-auth-only,Stoppe uniquement Keycloak + DB)
-	$(call help_line,restart,Redemarre les services)
-	$(call help_line,logs,Affiche les logs)
-	$(call help_line,monitoring-logs,Logs only monitoring services)
-	$(call help_line,auth-logs,Logs only auth services (Keycloak))
-	$(call help_line,ps,Montre le statut des services)
-	$(call help_line,monitoring-status,Statut health monitoring)
-	$(call help_line,auth-status,Statut health auth (Keycloak))
-	$(call help_line,reset-grafana,Reset Grafana (delete data, use new password))
-	$(call help_line,reset-keycloak,Reset Keycloak (delete data))
+	@printf "\n## Applications\n"
+	@printf "### pgAdmin (app)\n"
+	$(call help_line,pgadmin up,Start pgAdmin app)
+	$(call help_line,pgadmin down,Stop pgAdmin app)
+	$(call help_line,pgadmin logs,Logs for pgAdmin app)
+	$(call help_line,pgadmin status,Status for pgAdmin app)
+	@printf "### Monitoring (app)\n"
+	$(call help_line,monitoring up,Start monitoring app)
+	$(call help_line,monitoring down,Stop monitoring app)
+	$(call help_line,monitoring logs,Logs for monitoring app)
+	$(call help_line,monitoring status,Status for monitoring app)
+	$(call help_line,reset-monitoring,Reset monitoring data volumes)
+	@printf "### Beacon Ollama\n"
+	$(call help_line,beacon-ollama up,Start Beacon Ollama services)
+	$(call help_line,beacon-ollama down,Stop Beacon Ollama services)
+	$(call help_line,beacon-ollama build,Build Beacon Ollama services)
+	$(call help_line,beacon-ollama test,Run Beacon Ollama health checks)
+	$(call help_line,beacon-ollama status,Status for Beacon Ollama services)
+	@printf "### n8n\n"
+	$(call help_line,n8n up,Start n8n services)
+	$(call help_line,n8n down,Stop n8n services)
+	$(call help_line,n8n logs,Logs for n8n services)
+	$(call help_line,n8n status,Status for n8n services)
+	@printf "### MinIO\n"
+	$(call help_line,minio up,Start MinIO services)
+	$(call help_line,minio down,Stop MinIO services)
+	$(call help_line,minio logs,Logs for MinIO services)
+	$(call help_line,minio status,Status for MinIO services)
+	$(call help_line,minio test,Run MinIO health check)
+	@printf "### PostgreSQL\n"
+	$(call help_line,postgresql up,Start PostgreSQL services)
+	$(call help_line,postgresql down,Stop PostgreSQL services)
+	$(call help_line,postgresql logs,Logs for PostgreSQL services)
+	$(call help_line,postgresql status,Status for PostgreSQL services)
+	$(call help_line,postgresql test,Run PostgreSQL readiness check)
+	@printf "### Redis\n"
+	$(call help_line,redis up,Start Redis services)
+	$(call help_line,redis down,Stop Redis services)
+	$(call help_line,redis logs,Logs for Redis services)
+	$(call help_line,redis status,Status for Redis services)
+	$(call help_line,redis test,Run Redis health check)
+	@printf "### MailHog\n"
+	$(call help_line,mailhog up,Start MailHog services)
+	$(call help_line,mailhog down,Stop MailHog services)
+	$(call help_line,mailhog logs,Logs for MailHog services)
+	$(call help_line,mailhog status,Status for MailHog services)
+	$(call help_line,mailhog test,Run MailHog health check)
+	@printf "### Supabase\n"
+	$(call help_line,supabase up,Start Supabase services)
+	$(call help_line,supabase down,Stop Supabase services)
+	$(call help_line,supabase logs,Logs for Supabase services)
+	$(call help_line,supabase status,Status for Supabase services)
+	$(call help_line,supabase test,Run Supabase readiness check)
+	@printf "### ChromaDB\n"
+	$(call help_line,chromadb up,Start ChromaDB services)
+	$(call help_line,chromadb down,Stop ChromaDB services)
+	$(call help_line,chromadb logs,Logs for ChromaDB services)
+	$(call help_line,chromadb status,Status for ChromaDB services)
+	$(call help_line,chromadb test,Run ChromaDB health check)
+	@printf "### Gotenberg\n"
+	$(call help_line,gotenberg up,Start Gotenberg services)
+	$(call help_line,gotenberg down,Stop Gotenberg services)
+	$(call help_line,gotenberg logs,Logs for Gotenberg services)
+	$(call help_line,gotenberg status,Status for Gotenberg services)
 	@printf "\n## Infra\n"
-	@printf "### pgAdmin\n"
-	$(call help_line,up-pgadmin,Start pgAdmin service)
-	$(call help_line,down-pgadmin,Stop pgAdmin service)
-	$(call help_line,pgadmin-logs,Logs for pgAdmin service)
-	$(call help_line,pgadmin-status,Status for pgAdmin service)
-	$(call help_line,pgadmin-reset,Reset pgAdmin (delete data))
-	@printf "\n## VectorDB\n"
-	$(call help_line,vectordb-up,Start VectorDB services)
-	$(call help_line,vectordb-down,Stop VectorDB services)
-	$(call help_line,vectordb-logs,Logs for VectorDB services)
-	$(call help_line,vectordb-status,Status for VectorDB services)
-	$(call help_line,vectordb-test,Run VectorDB connectivity test query)
-	@printf "\n## Beacon Library\n"
-	$(call help_line,library-install,Install backend and frontend deps)
-	$(call help_line,library-dev,Run backend + frontend in dev mode)
-	$(call help_line,library-up,Start Beacon Library services)
-	$(call help_line,library-down,Stop Beacon Library services)
-	$(call help_line,library-logs,Logs for Beacon Library services)
-	$(call help_line,library-lint,Lint backend + frontend)
-	$(call help_line,library-test-unit,Run backend unit tests)
-	$(call help_line,library-observability-up,Start library collectors)
-	$(call help_line,library-minio-test,Run library MinIO tests)
-	@printf "\n## SSL / Private CA\n"
-	$(call help_line,ssl-init,Create private CA and certificates)
-	$(call help_line,ssl-renew,Renew server certificate)
-	$(call help_line,ssl-status,Show certificate info and expiry)
-	$(call help_line,ssl-install-ca-macos,Install CA on macOS)
-	$(call help_line,ssl-show-ca-path,Show path for NODE_EXTRA_CA_CERTS)
-	@printf "\n## CI Pipeline\n"
-	$(call help_line,ci,Pipeline CI complet (lint + build))
-	@printf "\n## Release/Deploy\n"
-	$(call help_line,push,Push l'image vers le registry)
-	@printf "\n## Info\n"
-	$(call help_line,version,Affiche la version)
-	$(call help_line,info,Affiche project/env/image)
-	$(call help_line,env-check,Verifie les variables d'environnement)
+	@printf "### Edge (Traefik + static web)\n"
+	$(call help_line,up-edge,Start edge services)
+	$(call help_line,down-edge,Stop edge services)
+	$(call help_line,edge-logs,Logs for edge services)
+	$(call help_line,edge-status,Status for edge services)
+	$(call help_line,build-edge,Build edge services)
+	$(call help_line,test-edge,Test edge config)
+	@printf "### DNS\n"
+	$(call help_line,up-dns,Start DNS service)
+	$(call help_line,down-dns,Stop DNS service)
+	$(call help_line,dns-logs,Logs for DNS service)
+	$(call help_line,dns-status,Status for DNS service)
+	$(call help_line,dns-build,Build DNS service)
+	$(call help_line,dns-test,Run DNS health check)
+	$(call help_line,create_dns,Create DNS zone + records via Technitium API)
+	@printf "### Keycloak\n"
+	$(call help_line,up-keycloak,Start Keycloak services)
+	$(call help_line,down-keycloak,Stop Keycloak services)
+	$(call help_line,keycloak-logs,Logs for Keycloak services)
+	$(call help_line,keycloak-status,Status for Keycloak services)
+	$(call help_line,reset-keycloak,Reset Keycloak data volume)
 
 version:
 	@echo "$(VERSION)"
@@ -85,7 +106,7 @@ info:
 
 env-check:
 	@echo "Checking environment variables..."
-	@echo "NGINX_HTTP_PORT: ${NGINX_HTTP_PORT:-80}"
+	@echo "TRAEFIK_HTTP_PORT: ${TRAEFIK_HTTP_PORT:-80}"
 	@echo "GRAFANA_PORT: ${GRAFANA_PORT:-3000}"
 	@echo "GF_SECURITY_ADMIN_PASSWORD: $${GF_SECURITY_ADMIN_PASSWORD:-not set}"
 	@if [ -f .env ]; then \

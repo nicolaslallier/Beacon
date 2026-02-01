@@ -1,0 +1,76 @@
+services:
+  pgadmin:
+    image: dpage/pgadmin4:9.11
+    container_name: beacon-pgadmin-app
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@beacon.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-change_me}
+      PGADMIN_CONFIG_SERVER_MODE: "${PGADMIN_SERVER_MODE:-False}"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "${PGADMIN_MASTER_PASSWORD_REQUIRED:-False}"
+      PGADMIN_CONFIG_SCRIPT_NAME: "'${PGADMIN_SCRIPT_NAME:-/pgadmin}'"
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+    dns_search:
+      - ${TECHNITIUM_DNS_SEARCH:-famillelallier.net}
+    expose:
+      - "80"
+    volumes:
+      - beacon_pgadmin-data:/var/lib/pgadmin
+    networks:
+      pgadmin_net:
+        aliases:
+          - pgadmin
+      nginx_net:
+        aliases:
+          - pgadmin
+    healthcheck:
+      test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  pgadmin-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-pgadmin-nginx
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      PGADMIN_SERVER_NAME: ${PGADMIN_SERVER_NAME:-pgadmin.beacon.local}
+      PGADMIN_UPSTREAM_HOST: ${PGADMIN_UPSTREAM_HOST:-pgadmin}
+      PGADMIN_UPSTREAM_PORT: ${PGADMIN_UPSTREAM_PORT:-80}
+      PGADMIN_SCRIPT_NAME: ${PGADMIN_SCRIPT_NAME:-/pgadmin}
+      DOLLAR: $$
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+    dns_search:
+      - ${TECHNITIUM_DNS_SEARCH:-famillelallier.net}
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      pgadmin:
+        condition: service_healthy
+    networks:
+      - pgadmin_net
+      - nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  beacon_pgadmin-data:
+
+networks:
+  pgadmin_net:
+    name: beacon_pgadmin_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

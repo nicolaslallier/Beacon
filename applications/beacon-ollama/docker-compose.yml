@@ -1,0 +1,61 @@
+services:
+  beacon-ollama:
+    image: ollama/ollama:latest
+    container_name: beacon-ollama
+    expose:
+      - "11434"
+    volumes:
+      - beacon_ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - beacon_ollama_net
+    restart: unless-stopped
+
+  beacon-ollama-webui:
+    image: ghcr.io/open-webui/open-webui:0.3.35
+    container_name: beacon-ollama-webui
+    expose:
+      - "8080"
+    environment:
+      OLLAMA_BASE_URL: http://beacon-ollama:11434
+      WEBUI_BASE_URL: /beacon-ollama-webui
+      WEBUI_URL: https://beacon.famillelallier.net/beacon-ollama-webui
+    volumes:
+      - beacon_ollama-webui-data:/app/backend/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - beacon_ollama_net
+    depends_on:
+      - beacon-ollama
+    restart: unless-stopped
+
+  beacon-ollama-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-ollama-nginx
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - beacon-ollama
+      - beacon-ollama-webui
+    networks:
+      - beacon_ollama_net
+    restart: unless-stopped
+
+volumes:
+  beacon_ollama-data:
+  beacon_ollama-webui-data:
+
+networks:
+  beacon_ollama_net:
+    name: beacon_ollama_net
+    external: true

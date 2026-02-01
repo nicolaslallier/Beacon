@@ -22,7 +22,6 @@ MOVE_MAP = {
         "traefik",
         "certbot",
         "ca",
-        "certs",
         "templates",
         "conf.d",
         "html",
@@ -34,6 +33,7 @@ MOVE_MAP = {
         ".vscode",
         "makefiles",
         "Makefile",
+        "certs",
     ],
     "docs": [
         "KEYCLOAK_SETUP.md",

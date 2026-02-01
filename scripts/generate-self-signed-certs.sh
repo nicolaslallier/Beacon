@@ -4,7 +4,7 @@
 
 set -e
 
-CERTS_DIR="${1:-./certs}"
+CERTS_DIR="${1:-./config/certs}"
 DOMAIN="${2:-beacon.famillelallier.net}"
 
 # Create certs directory
@@ -44,7 +44,11 @@ DNS.7 = tempo.${DOMAIN}
 DNS.8 = minio.${DOMAIN}
 DNS.9 = s3.${DOMAIN}
 DNS.10 = beacon-library.famillelallier.net
-DNS.11 = localhost
+DNS.11 = postgresql.${DOMAIN}
+DNS.12 = redis.${DOMAIN}
+DNS.13 = supabase.${DOMAIN}
+DNS.14 = chromadb.${DOMAIN}
+DNS.15 = localhost
 EOF
 
 # Generate self-signed certificate

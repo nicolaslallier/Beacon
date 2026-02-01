@@ -1,0 +1,83 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: beacon-redis
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$${REDIS_PASSWORD}" ]; then
+          exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+        else
+          exec redis-server --appendonly yes
+        fi
+    volumes:
+      - beacon_redis-data:/data
+    networks:
+      - redis_net
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD:-} ping | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redisinsight:
+    image: redislabs/redisinsight:1.14.0
+    container_name: beacon-redisinsight
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - RI_APP_PORT=${REDISINSIGHT_PORT:-8001}
+    expose:
+      - "8001"
+    volumes:
+      - beacon_redisinsight-data:/db
+    networks:
+      - redis_net
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-redis-nginx
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - REDIS_SERVER_NAME=${REDIS_SERVER_NAME:-redis.beacon.famillelallier.net}
+      - REDIS_GUI_UPSTREAM_HOST=${REDIS_GUI_UPSTREAM_HOST:-redisinsight}
+      - REDIS_GUI_UPSTREAM_PORT=${REDIS_GUI_UPSTREAM_PORT:-8001}
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      redisinsight:
+        condition: service_started
+    networks:
+      - redis_net
+      - nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  beacon_redis-data:
+    name: beacon_redis-data
+  beacon_redisinsight-data:
+    name: beacon_redisinsight-data
+
+networks:
+  redis_net:
+    name: beacon_redis_net
+  nginx_net:
+    external: true
+    name: beacon_nginx_net

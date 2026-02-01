@@ -17,7 +17,7 @@ export default defineConfig({
     allowedHosts: [
       "beacon-library.famillelallier.net",
       "toolsuite.beacon.famillelallier.net",
-      "ollama.beacon.famillelallier.net",
+      "beacon-ollama.beacon.famillelallier.net",
       "localhost",
       "127.0.0.1",
     ],

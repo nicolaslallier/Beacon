@@ -1,0 +1,50 @@
+map ${DOLLAR}http_upgrade ${DOLLAR}connection_upgrade {
+  default upgrade;
+  "" close;
+}
+
+server {
+  listen 80;
+  server_name ${MINIO_SERVER_NAME};
+
+  client_max_body_size 0;
+
+  location = /healthz {
+    proxy_pass http://${MINIO_S3_UPSTREAM_HOST}:${MINIO_S3_UPSTREAM_PORT}/minio/health/live;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              ${DOLLAR}host;
+    proxy_set_header X-Real-IP         ${DOLLAR}remote_addr;
+    proxy_set_header X-Forwarded-For   ${DOLLAR}proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+  }
+
+  # MinIO Console (UI)
+  location / {
+    proxy_pass http://${MINIO_CONSOLE_UPSTREAM_HOST}:${MINIO_CONSOLE_UPSTREAM_PORT};
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              ${DOLLAR}host;
+    proxy_set_header X-Real-IP         ${DOLLAR}remote_addr;
+    proxy_set_header X-Forwarded-For   ${DOLLAR}proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+
+    proxy_set_header Upgrade           ${DOLLAR}http_upgrade;
+    proxy_set_header Connection        ${DOLLAR}connection_upgrade;
+  }
+
+  # Optional S3 API via /minio/ path
+  location ^~ /minio/ {
+    rewrite ^/minio/?(.*)$ /${DOLLAR}1 break;
+    proxy_pass http://${MINIO_S3_UPSTREAM_HOST}:${MINIO_S3_UPSTREAM_PORT};
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              ${DOLLAR}host;
+    proxy_set_header X-Real-IP         ${DOLLAR}remote_addr;
+    proxy_set_header X-Forwarded-For   ${DOLLAR}proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+
+    proxy_set_header Upgrade           ${DOLLAR}http_upgrade;
+    proxy_set_header Connection        ${DOLLAR}connection_upgrade;
+  }
+}

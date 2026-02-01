@@ -34,17 +34,17 @@ make ssl-install-ca-macos
 **macOS (manual):**
 ```bash
 sudo security add-trusted-cert -d -r trustRoot \
-    -k /Library/Keychains/System.keychain ca/beacon-ca.crt
+    -k /Library/Keychains/System.keychain config/ca/beacon-ca.crt
 ```
 
 **Linux (Ubuntu/Debian):**
 ```bash
-sudo cp ca/beacon-ca.crt /usr/local/share/ca-certificates/beacon-ca.crt
+sudo cp config/ca/beacon-ca.crt /usr/local/share/ca-certificates/beacon-ca.crt
 sudo update-ca-certificates
 ```
 
 **Windows:**
-1. Double-click `ca/beacon-ca.crt`
+1. Double-click `config/ca/beacon-ca.crt`
 2. Click "Install Certificate"
 3. Select "Local Machine"
 4. Choose "Place all certificates in the following store"
@@ -75,7 +75,7 @@ For LM Studio to trust your private CA:
 make ssl-show-ca-path
 
 # Set it before starting LM Studio
-export NODE_EXTRA_CA_CERTS=/path/to/Beacon/ca/beacon-ca.crt
+export NODE_EXTRA_CA_CERTS=/path/to/Beacon/config/ca/beacon-ca.crt
 ```
 
 **Option 2: Install CA system-wide (recommended)**
@@ -118,15 +118,15 @@ The CA remains valid for 10 years. You only need to recreate it if:
 
 | Path | Description |
 |------|-------------|
-| `ca/beacon-ca.crt` | CA certificate (distribute to clients) |
-| `ca/beacon-ca.key` | CA private key (KEEP SECRET!) |
-| `certs/fullchain.pem` | Server certificate + CA chain |
-| `certs/privkey.pem` | Server private key |
+| `config/ca/beacon-ca.crt` | CA certificate (distribute to clients) |
+| `config/ca/beacon-ca.key` | CA private key (KEEP SECRET!) |
+| `config/certs/fullchain.pem` | Server certificate + CA chain |
+| `config/certs/privkey.pem` | Server private key |
 
 ## Security Notes
 
-1. **Protect the CA private key**: `ca/beacon-ca.key` can sign ANY certificate
-2. **Don't share the CA key**: Only share `ca/beacon-ca.crt`
+1. **Protect the CA private key**: `config/ca/beacon-ca.key` can sign ANY certificate
+2. **Don't share the CA key**: Only share `config/ca/beacon-ca.crt`
 3. **Backup the CA**: If you lose it, you'll need to reinstall on all devices
 
 ## Troubleshooting
@@ -139,7 +139,7 @@ The CA isn't installed or trusted. Follow the installation steps above.
 
 Set the environment variable:
 ```bash
-export NODE_EXTRA_CA_CERTS=/path/to/Beacon/ca/beacon-ca.crt
+export NODE_EXTRA_CA_CERTS=/path/to/Beacon/config/ca/beacon-ca.crt
 ```
 
 Or install the CA system-wide.
@@ -157,7 +157,7 @@ Run `make ssl-renew` to generate a new certificate.
 ### Verify certificate chain
 
 ```bash
-openssl verify -CAfile ca/beacon-ca.crt certs/fullchain.pem
+openssl verify -CAfile config/ca/beacon-ca.crt config/certs/fullchain.pem
 ```
 
-Should output: `certs/fullchain.pem: OK`
+Should output: `config/certs/fullchain.pem: OK`

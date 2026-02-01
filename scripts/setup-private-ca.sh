@@ -8,7 +8,7 @@
 # Usage: ./scripts/setup-private-ca.sh
 #
 # After running this script:
-# 1. Install ca/beacon-ca.crt on devices that need to trust your certificates
+# 1. Install config/ca/beacon-ca.crt on devices that need to trust your certificates
 # 2. Certificates will be valid for 1 year, CA valid for 10 years
 # =============================================================================
 
@@ -23,8 +23,8 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 fi
 
 # Configuration
-CA_DIR="$PROJECT_DIR/ca"
-CERTS_DIR="$PROJECT_DIR/certs"
+CA_DIR="$PROJECT_DIR/config/ca"
+CERTS_DIR="$PROJECT_DIR/config/certs"
 CA_DAYS=3650  # 10 years for CA
 CERT_DAYS=365 # 1 year for certificates
 
@@ -39,6 +39,10 @@ DOMAINS=(
     "s3.beacon.famillelallier.net"
     "keycloak.beacon.famillelallier.net"
     "mcp-vector.beacon.famillelallier.net"
+    "postgresql.beacon.famillelallier.net"
+    "redis.beacon.famillelallier.net"
+    "supabase.beacon.famillelallier.net"
+    "chromadb.beacon.famillelallier.net"
     "localhost"
 )
 

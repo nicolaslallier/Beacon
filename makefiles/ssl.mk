@@ -13,26 +13,26 @@ ssl-renew:
 
 ssl-status:
 	@echo "=== Certificate Status ==="
-	@if [ -f certs/fullchain.pem ]; then \
+	@if [ -f config/certs/fullchain.pem ]; then \
 		echo "Server Certificate:"; \
-		openssl x509 -in certs/fullchain.pem -noout -subject -dates 2>/dev/null || echo "Could not read certificate"; \
+		openssl x509 -in config/certs/fullchain.pem -noout -subject -dates 2>/dev/null || echo "Could not read certificate"; \
 		echo ""; \
 		echo "Subject Alternative Names:"; \
-		openssl x509 -in certs/fullchain.pem -noout -text 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 || true; \
+		openssl x509 -in config/certs/fullchain.pem -noout -text 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 || true; \
 	else \
-		echo "No certificate found at certs/fullchain.pem"; \
+		echo "No certificate found at config/certs/fullchain.pem"; \
 		echo "Run 'make ssl-init' to create certificates"; \
 	fi
 	@echo ""
-	@if [ -f ca/beacon-ca.crt ]; then \
+	@if [ -f config/ca/beacon-ca.crt ]; then \
 		echo "CA Certificate:"; \
-		openssl x509 -in ca/beacon-ca.crt -noout -subject -dates 2>/dev/null || echo "Could not read CA certificate"; \
+		openssl x509 -in config/ca/beacon-ca.crt -noout -subject -dates 2>/dev/null || echo "Could not read CA certificate"; \
 	fi
 
 ssl-install-ca-macos:
 	@echo "Installing CA certificate on macOS..."
-	@if [ -f ca/beacon-ca.crt ]; then \
-		sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca/beacon-ca.crt; \
+	@if [ -f config/ca/beacon-ca.crt ]; then \
+		sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain config/ca/beacon-ca.crt; \
 		echo "CA installed. You may need to restart browsers."; \
 	else \
 		echo "CA not found. Run 'make ssl-init' first."; \
@@ -40,4 +40,4 @@ ssl-install-ca-macos:
 
 ssl-show-ca-path:
 	@echo "CA certificate path for NODE_EXTRA_CA_CERTS:"
-	@echo "export NODE_EXTRA_CA_CERTS=$(PWD)/ca/beacon-ca.crt"
+	@echo "export NODE_EXTRA_CA_CERTS=$(PWD)/config/ca/beacon-ca.crt"

@@ -1,20 +1,266 @@
 http:
   routers:
+    beaconStatic:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`)
+      service: beacon-static
+      tls: {}
+
+    n8n:
+      entryPoints:
+        - websecure
+      rule: Host(`n8n.beacon.famillelallier.net`)
+      service: n8n-nginx
+      middlewares:
+        - iframe-embed
+      tls: {}
+
+    pgadmin:
+      entryPoints:
+        - websecure
+      rule: Host(`pgadmin.beacon.famillelallier.net`)
+      service: pgadmin
+      middlewares:
+        - iframe-embed
+      tls: {}
+
+    minio:
+      entryPoints:
+        - websecure
+      rule: Host(`minio.beacon.famillelallier.net`)
+      service: minio-nginx
+      tls: {}
+
+    redis:
+      entryPoints:
+        - websecure
+      rule: Host(`redis.beacon.famillelallier.net`)
+      service: redis-nginx
+      tls: {}
+
+    supabase:
+      entryPoints:
+        - websecure
+      rule: Host(`supabase.beacon.famillelallier.net`)
+      service: supabase-nginx
+      tls: {}
+
+    chromadb:
+      entryPoints:
+        - websecure
+      rule: Host(`chromadb.beacon.famillelallier.net`)
+      service: chromadb-nginx
+      tls: {}
+
+    keycloak:
+      entryPoints:
+        - websecure
+      rule: Host(`keycloak.beacon.famillelallier.net`)
+      service: keycloak
+      tls: {}
+
+    grafana:
+      entryPoints:
+        - websecure
+      rule: Host(`grafana.beacon.famillelallier.net`)
+      service: grafana-nginx
+      middlewares:
+        - iframe-embed
+      tls: {}
+
+    beaconOllamaSubdomain:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon-ollama.beacon.famillelallier.net`)
+      service: beacon-ollama-nginx
+      tls: {}
+
+    beaconOllamaWebui:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && (PathPrefix(`/beacon-ollama-webui/`) || PathPrefix(`/_app/`) || PathPrefix(`/static/`) || Path(`/manifest.json`))
+      service: beacon-ollama-nginx
+      tls: {}
+
+    healthN8n:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/n8n`)
+      service: n8n-nginx
+      middlewares:
+        - health-n8n
+      tls: {}
+
+    healthPgadmin:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/pgadmin`)
+      service: pgadmin
+      middlewares:
+        - health-pgadmin
+      tls: {}
+
+    healthMinio:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/minio`)
+      service: minio-nginx
+      middlewares:
+        - health-minio
+      tls: {}
+
+    healthGrafana:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/grafana`)
+      service: grafana-nginx
+      middlewares:
+        - health-grafana
+      tls: {}
+
+    healthKeycloak:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/keycloak`)
+      service: keycloak-health
+      middlewares:
+        - health-keycloak
+      tls: {}
+
+    healthDns:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/dns`)
+      service: technitium
+      middlewares:
+        - health-dns
+      tls: {}
+
+    healthPostgresql:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/postgresql`)
+      service: postgresql-nginx
+      middlewares:
+        - health-postgresql
+      tls: {}
+
+    healthRedis:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/redis`)
+      service: redis-nginx
+      middlewares:
+        - health-redis
+      tls: {}
+
+    healthSupabase:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/supabase`)
+      service: supabase-nginx
+      middlewares:
+        - health-supabase
+      tls: {}
+
+    healthChromadb:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/chromadb`)
+      service: chromadb-nginx
+      middlewares:
+        - health-chromadb
+      tls: {}
+
+    healthBeaconOllama:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/beacon-ollama`)
+      service: beacon-ollama-nginx
+      middlewares:
+        - health-beacon-ollama
+      tls: {}
+
+    healthBeaconOllamaWebui:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/beacon-ollama-webui`)
+      service: beacon-ollama-nginx
+      middlewares:
+        - health-beacon-ollama-webui
+      tls: {}
+
     beaconLibraryApi:
       entryPoints:
-        - web
-      rule: PathPrefix(`/api`)
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && PathPrefix(`/api`)
       service: beaconLibraryApi
       middlewares:
         - rate-limit
         - cors
+      tls: {}
+
     oauth2Proxy:
       entryPoints:
-        - web
-      rule: PathPrefix(`/oauth2/`)
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && PathPrefix(`/oauth2/`)
       service: oauth2Proxy
+      tls: {}
 
   services:
+    beacon-static:
+      loadBalancer:
+        servers:
+          - url: http://infra-static:80
+    n8n-nginx:
+      loadBalancer:
+        servers:
+          - url: http://n8n-nginx:80
+    pgadmin:
+      loadBalancer:
+        servers:
+          - url: http://pgadmin:80
+    minio-nginx:
+      loadBalancer:
+        servers:
+          - url: http://minio-nginx:80
+    redis-nginx:
+      loadBalancer:
+        servers:
+          - url: http://redis-nginx:80
+    supabase-nginx:
+      loadBalancer:
+        servers:
+          - url: http://supabase-nginx:80
+    chromadb-nginx:
+      loadBalancer:
+        servers:
+          - url: http://chromadb-nginx:80
+    keycloak:
+      loadBalancer:
+        servers:
+          - url: http://infra-keycloak:8080
+    keycloak-health:
+      loadBalancer:
+        servers:
+          - url: http://infra-keycloak:9000
+    technitium:
+      loadBalancer:
+        servers:
+          - url: http://infra-technitium-dns:5380
+    postgresql-nginx:
+      loadBalancer:
+        servers:
+          - url: http://postgresql-nginx:80
+    grafana-nginx:
+      loadBalancer:
+        servers:
+          - url: http://grafana-nginx:80
+    beacon-ollama-nginx:
+      loadBalancer:
+        servers:
+          - url: http://beacon-ollama-nginx:80
     beaconLibraryApi:
       loadBalancer:
         servers:
@@ -22,12 +268,12 @@ http:
     oauth2Proxy:
       loadBalancer:
         servers:
-          - url: http://oauth2-proxy:4180
+          - url: http://infra-oauth2-proxy:4180
 
   middlewares:
     oauth2-auth:
       forwardAuth:
-        address: http://oauth2-proxy:4180/oauth2/auth
+        address: http://infra-oauth2-proxy:4180/oauth2/auth
         trustForwardHeader: true
         authResponseHeaders:
           - X-Auth-Request-User
@@ -56,3 +302,65 @@ http:
         accessControlAllowCredentials: true
         accessControlMaxAge: 300
         addVaryHeader: true
+    iframe-embed:
+      headers:
+        contentSecurityPolicy: "frame-ancestors 'self' https://beacon.famillelallier.net"
+        customResponseHeaders:
+          X-Frame-Options: "ALLOWALL"
+    health-n8n:
+      replacePath:
+        path: /healthz
+    health-pgadmin:
+      replacePath:
+        path: /misc/ping
+    health-minio:
+      replacePath:
+        path: /healthz
+    health-grafana:
+      replacePath:
+        path: /api/health
+    health-keycloak:
+      replacePath:
+        path: /health/ready
+    health-dns:
+      replacePath:
+        path: /
+    health-postgresql:
+      replacePath:
+        path: /healthz
+    health-redis:
+      replacePath:
+        path: /healthz
+    health-supabase:
+      replacePath:
+        path: /healthz
+    health-chromadb:
+      replacePath:
+        path: /healthz
+    health-beacon-ollama:
+      replacePath:
+        path: /healthz-beacon-ollama
+    health-beacon-ollama-webui:
+      replacePath:
+        path: /healthz-beacon-ollama-webui
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/fullchain.pem
+      keyFile: /etc/traefik/certs/privkey.pem
+
+tcp:
+  routers:
+    postgresql:
+      entryPoints:
+        - postgres
+      # Some PostgreSQL clients do not send SNI; accept all and passthrough TLS.
+      rule: HostSNI(`*`)
+      service: postgresql
+      tls:
+        passthrough: true
+  services:
+    postgresql:
+      loadBalancer:
+        servers:
+          - address: postgresql-nginx:5432
