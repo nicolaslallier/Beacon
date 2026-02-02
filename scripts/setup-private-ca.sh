@@ -40,6 +40,7 @@ DOMAINS=(
     "keycloak.beacon.famillelallier.net"
     "mcp-vector.beacon.famillelallier.net"
     "postgresql.beacon.famillelallier.net"
+    "beacon-ollama-webui.beacon.famillelallier.net"
     "redis.beacon.famillelallier.net"
     "supabase.beacon.famillelallier.net"
     "chromadb.beacon.famillelallier.net"

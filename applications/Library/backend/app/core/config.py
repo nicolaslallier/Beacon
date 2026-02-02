@@ -195,8 +195,41 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Search (ChromaDB + Ollama)
     # ==========================================================================
+    vector_store_provider: str = Field(
+        default="supabase",
+        description="Vector store provider (chromadb/supabase)",
+    )
     chromadb_host: str = Field(default="localhost", description="ChromaDB host")
     chromadb_port: int = Field(default=8000, description="ChromaDB port")
+
+    supabase_url: str = Field(
+        default="http://localhost:8000",
+        description="Supabase API base URL",
+    )
+    supabase_anon_key: Optional[str] = Field(
+        default=None,
+        description="Supabase anon key",
+    )
+    supabase_service_role_key: Optional[str] = Field(
+        default=None,
+        description="Supabase service role key",
+    )
+    supabase_embeddings_table: str = Field(
+        default="embeddings",
+        description="Supabase embeddings table name",
+    )
+    supabase_match_function: str = Field(
+        default="match_embeddings",
+        description="Supabase RPC function for vector search",
+    )
+    supabase_match_threshold: float = Field(
+        default=0.5,
+        description="Default similarity threshold",
+    )
+    supabase_match_count: int = Field(
+        default=10,
+        description="Default max results",
+    )
 
     ollama_host: str = Field(default="localhost", description="Ollama host")
     ollama_port: int = Field(default=11434, description="Ollama port")
@@ -209,6 +242,11 @@ class Settings(BaseSettings):
     def chromadb_url(self) -> str:
         """Construct the ChromaDB URL."""
         return f"http://{self.chromadb_host}:{self.chromadb_port}"
+
+    @property
+    def supabase_rest_url(self) -> str:
+        """Construct the Supabase PostgREST URL."""
+        return f"{self.supabase_url.rstrip('/')}/rest/v1"
 
     @property
     def ollama_url(self) -> str:

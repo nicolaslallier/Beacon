@@ -5,8 +5,8 @@ services:
     routes:
       - name: auth
         paths:
-          - /auth
-        strip_path: false
+          - /auth/v1
+        strip_path: true
   - name: rest
     url: http://rest:3000
     routes:

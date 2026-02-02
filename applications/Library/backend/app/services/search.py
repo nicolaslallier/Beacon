@@ -330,6 +330,309 @@ class ChromaDBService:
             return []
 
 
+class SupabaseVectorService:
+    """Service for vector storage and search using Supabase (pgvector + PostgREST)."""
+
+    def __init__(
+        self,
+        base_url: str = None,
+        service_role_key: str = None,
+        anon_key: str = None,
+    ):
+        self.base_url = (base_url or settings.supabase_url).rstrip("/")
+        self.rest_url = f"{self.base_url}/rest/v1"
+        self.rpc_url = f"{self.rest_url}/rpc"
+        self.service_role_key = service_role_key or settings.supabase_service_role_key
+        self.anon_key = anon_key or settings.supabase_anon_key
+        self.table = settings.supabase_embeddings_table
+        self.match_function = settings.supabase_match_function
+
+    @staticmethod
+    def _embedding_literal(embedding: List[float]) -> str:
+        return "[" + ",".join(str(float(v)) for v in embedding) + "]"
+
+    def _headers(self, use_service: bool = True) -> Dict[str, str]:
+        key = self.service_role_key if use_service else (self.anon_key or self.service_role_key)
+        if not key:
+            raise RuntimeError("Supabase API key is not configured")
+        return {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+
+    async def add_document(
+        self,
+        library_id: uuid.UUID,
+        document_id: str,
+        content: str,
+        embedding: List[float],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Add a document to the vector store."""
+        return await self.add_documents_batch(
+            library_id=library_id,
+            document_ids=[document_id],
+            contents=[content],
+            embeddings=[embedding],
+            metadatas=[metadata or {}],
+        )
+
+    async def add_documents_batch(
+        self,
+        library_id: uuid.UUID,
+        document_ids: List[str],
+        contents: List[str],
+        embeddings: List[List[float]],
+        metadatas: List[Dict[str, Any]],
+    ) -> bool:
+        """Add multiple documents to the vector store in batch."""
+        payload = []
+        for idx, document_id in enumerate(document_ids):
+            metadata = metadatas[idx] or {}
+            file_id = metadata.get("file_id")
+            payload.append({
+                "library_id": str(library_id),
+                "file_id": str(file_id) if file_id else None,
+                "chunk_id": document_id,
+                "content": contents[idx],
+                "embedding": self._embedding_literal(embeddings[idx]),
+                "metadata": metadata,
+            })
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.rest_url}/{self.table}",
+                    headers=self._headers(),
+                    json=payload,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(
+                "supabase_add_documents_error",
+                count=len(document_ids),
+                error=str(e),
+            )
+            return False
+
+    async def update_document(
+        self,
+        library_id: uuid.UUID,
+        document_id: str,
+        content: str,
+        embedding: List[float],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Update a document in the vector store."""
+        try:
+            params = {
+                "library_id": f"eq.{library_id}",
+                "chunk_id": f"eq.{document_id}",
+            }
+            payload = {
+                "content": content,
+                "embedding": self._embedding_literal(embedding),
+                "metadata": metadata or {},
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.patch(
+                    f"{self.rest_url}/{self.table}",
+                    headers=self._headers(),
+                    params=params,
+                    json=payload,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(
+                "supabase_update_document_error",
+                document_id=document_id,
+                error=str(e),
+            )
+            return False
+
+    async def delete_document(
+        self,
+        library_id: uuid.UUID,
+        document_id: str,
+    ) -> bool:
+        """Delete a document from the vector store."""
+        try:
+            params = {
+                "library_id": f"eq.{library_id}",
+                "chunk_id": f"eq.{document_id}",
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.rest_url}/{self.table}",
+                    headers=self._headers(),
+                    params=params,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(
+                "supabase_delete_document_error",
+                document_id=document_id,
+                error=str(e),
+            )
+            return False
+
+    async def delete_documents_by_file(
+        self,
+        library_id: uuid.UUID,
+        file_id: str,
+    ) -> bool:
+        """Delete all chunks belonging to a file."""
+        try:
+            params = {
+                "library_id": f"eq.{library_id}",
+                "file_id": f"eq.{file_id}",
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.rest_url}/{self.table}",
+                    headers=self._headers(),
+                    params=params,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(
+                "supabase_delete_by_file_error",
+                file_id=file_id,
+                error=str(e),
+            )
+            return False
+
+    async def delete_library_collection(self, library_id: uuid.UUID) -> bool:
+        """Delete all embeddings for a library."""
+        try:
+            params = {"library_id": f"eq.{library_id}"}
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.rest_url}/{self.table}",
+                    headers=self._headers(),
+                    params=params,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(
+                "supabase_delete_collection_error",
+                library_id=str(library_id),
+                error=str(e),
+            )
+            return False
+
+    async def search(
+        self,
+        library_id: uuid.UUID,
+        query_embedding: List[float],
+        n_results: int = 10,
+        where: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Search for similar documents."""
+        payload = {
+            "query_embedding": self._embedding_literal(query_embedding),
+            "match_library_id": str(library_id),
+            "match_threshold": settings.supabase_match_threshold,
+            "match_count": n_results,
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.rpc_url}/{self.match_function}",
+                    headers=self._headers(),
+                    json=payload,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                rows = response.json() or []
+
+            results = []
+            for row in rows:
+                metadata = row.get("metadata") or {}
+                metadata.setdefault("file_id", row.get("file_id"))
+                metadata.setdefault("library_id", row.get("library_id"))
+                metadata.setdefault("chunk_id", row.get("chunk_id"))
+
+                if where and any(metadata.get(key) != value for key, value in where.items()):
+                    continue
+
+                similarity = row.get("similarity", 0)
+                results.append({
+                    "id": row.get("chunk_id") or row.get("id"),
+                    "document": row.get("content"),
+                    "metadata": metadata,
+                    "distance": max(0.0, 1 - similarity),
+                })
+
+            return results
+        except Exception as e:
+            logger.error(
+                "supabase_search_error",
+                library_id=str(library_id),
+                error=str(e),
+            )
+            return []
+
+    async def get_chunks_by_file(
+        self,
+        library_id: uuid.UUID,
+        file_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Get all chunks for a specific file."""
+        try:
+            params = {
+                "library_id": f"eq.{library_id}",
+                "file_id": f"eq.{file_id}",
+                "select": "chunk_id,content,metadata",
+                "order": "chunk_id",
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/{self.table}",
+                    headers=self._headers(),
+                    params=params,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                rows = response.json() or []
+
+            chunks = []
+            for row in rows:
+                chunks.append({
+                    "id": row.get("chunk_id"),
+                    "document": row.get("content"),
+                    "metadata": row.get("metadata") or {},
+                })
+            return chunks
+        except Exception as e:
+            logger.error(
+                "supabase_get_chunks_error",
+                file_id=file_id,
+                error=str(e),
+            )
+            return []
+
+
+def get_vector_store() -> Any:
+    """Return the configured vector store implementation."""
+    provider = (settings.vector_store_provider or "chromadb").lower()
+    if provider == "supabase":
+        return SupabaseVectorService()
+    return ChromaDBService()
+
+
 class SemanticSearchService:
     """High-level semantic search service with multi-chunk support."""
 
@@ -337,11 +640,11 @@ class SemanticSearchService:
         self,
         db: AsyncSession,
         embedding_service: Optional[OllamaEmbeddingService] = None,
-        vector_store: Optional[ChromaDBService] = None,
+        vector_store: Optional[Any] = None,
     ):
         self.db = db
         self.embedding_service = embedding_service or OllamaEmbeddingService()
-        self.vector_store = vector_store or ChromaDBService()
+        self.vector_store = vector_store or get_vector_store()
 
     async def index_file(
         self,
@@ -838,7 +1141,7 @@ async def start_indexing_worker(db_session_factory, storage_service):
                 if action == "delete_file":
                     if file_id and library_id:
                         try:
-                            vector_store = ChromaDBService()
+                            vector_store = get_vector_store()
                             # Delete all chunks for the file
                             await vector_store.delete_documents_by_file(
                                 library_id=library_id,
@@ -867,7 +1170,7 @@ async def start_indexing_worker(db_session_factory, storage_service):
                 if action == "delete_library":
                     if library_id:
                         try:
-                            vector_store = ChromaDBService()
+                            vector_store = get_vector_store()
                             await vector_store.delete_library_collection(library_id)
                             logger.info(
                                 "deindex_library_complete",

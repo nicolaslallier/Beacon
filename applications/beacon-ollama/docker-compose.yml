@@ -16,14 +16,14 @@ services:
     restart: unless-stopped
 
   beacon-ollama-webui:
-    image: ghcr.io/open-webui/open-webui:0.3.35
+    image: ghcr.io/open-webui/open-webui:0.7.2
     container_name: beacon-ollama-webui
     expose:
       - "8080"
     environment:
       OLLAMA_BASE_URL: http://beacon-ollama:11434
-      WEBUI_BASE_URL: /beacon-ollama-webui
-      WEBUI_URL: https://beacon.famillelallier.net/beacon-ollama-webui
+      WEBUI_BASE_URL: /
+      WEBUI_URL: https://beacon-ollama-webui.beacon.famillelallier.net
     volumes:
       - beacon_ollama-webui-data:/app/backend/data
     healthcheck:

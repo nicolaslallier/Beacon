@@ -79,7 +79,14 @@ http:
     beaconOllamaWebui:
       entryPoints:
         - websecure
-      rule: Host(`beacon.famillelallier.net`) && (PathPrefix(`/beacon-ollama-webui/`) || PathPrefix(`/_app/`) || PathPrefix(`/static/`) || Path(`/manifest.json`))
+      rule: Host(`beacon.famillelallier.net`) && PathPrefix(`/beacon-ollama-webui/`)
+      service: beacon-ollama-nginx
+      tls: {}
+
+    beaconOllamaWebuiHost:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon-ollama-webui.beacon.famillelallier.net`)
       service: beacon-ollama-nginx
       tls: {}
 
