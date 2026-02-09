@@ -44,6 +44,7 @@ docker-build:
 	reset-grafana reset-monitoring reset-keycloak \
 	up-toolsuite down-toolsuite toolsuite-logs toolsuite-status \
 	qa-up qa-down qa-logs qa-status qa-build qa \
+	tools-up tools-down tools-logs tools-status tools-build tools \
 	toolsuite-spa-sync \
 	vectordb-up vectordb-down vectordb-logs vectordb-status vectordb-test \
 	pgadmin-up pgadmin-down pgadmin-logs pgadmin-status pgadmin \
@@ -88,6 +89,9 @@ endif
 ifneq (,$(filter qa,$(MAKECMDGOALS)))
 QA_MODE := 1
 endif
+ifneq (,$(filter tools,$(MAKECMDGOALS)))
+TOOLS_MODE := 1
+endif
 ifneq (,$(filter minio,$(MAKECMDGOALS)))
 MINIO_MODE := 1
 endif
@@ -120,7 +124,7 @@ BEACON_OLLAMA_MODE := 1
 endif
 
 up:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) up -d; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) up -d; fi
 
 # Start only core edge services
 up-core:
@@ -146,16 +150,16 @@ test-edge:
 	$(MAKE) lint-nginx
 
 down:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) down; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) down; fi
 
 restart:
 	$(COMPOSE_MONITORING_AUTH) up -d --force-recreate
 
 logs:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) logs -f; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) logs -f; fi
 
 ps:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) ps; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) ps; fi
 
 # --- Monitoring targets ---
 up-monitoring:
@@ -418,6 +422,22 @@ qa-logs:
 qa-status:
 	$(COMPOSE_QA) ps
 
+# --- Beacon Tools targets ---
+tools-up:
+	$(COMPOSE_BEACON_TOOLS) up -d --build
+
+tools-down:
+	$(COMPOSE_BEACON_TOOLS) down
+
+tools-build:
+	$(COMPOSE_BEACON_TOOLS) build
+
+tools-logs:
+	$(COMPOSE_BEACON_TOOLS) logs -f
+
+tools-status:
+	$(COMPOSE_BEACON_TOOLS) ps
+
 # --- Standalone pgAdmin targets ---
 pgadmin-up:
 	$(COMPOSE_PGADMIN_APP) up -d
@@ -455,6 +475,29 @@ qa:
 	  status) $(MAKE) qa-status ;; \
 	  build) $(MAKE) qa-build ;; \
 	  *) echo "Usage: make qa {up|down|logs|log|status|build}"; exit 2 ;; \
+	esac
+
+status:
+	@:
+
+log:
+	@:
+
+build:
+	@:
+endif
+
+# --- Namespaced targets (make tools up|down|logs|log|status|build) ---
+ifneq (,$(filter tools,$(MAKECMDGOALS)))
+tools:
+	@case "$(word 2,$(MAKECMDGOALS))" in \
+	  up) $(MAKE) tools-up ;; \
+	  down) $(MAKE) tools-down ;; \
+	  logs) $(MAKE) tools-logs ;; \
+	  log) $(MAKE) tools-logs ;; \
+	  status) $(MAKE) tools-status ;; \
+	  build) $(MAKE) tools-build ;; \
+	  *) echo "Usage: make tools {up|down|logs|log|status|build}"; exit 2 ;; \
 	esac
 
 status:

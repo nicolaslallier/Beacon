@@ -97,6 +97,13 @@ http:
       service: beacon-qa-nginx
       tls: {}
 
+    beaconTools:
+      entryPoints:
+        - websecure
+      rule: Host(`tools.beacon.famillelallier.net`)
+      service: beacon-tools-nginx
+      tls: {}
+
     healthN8n:
       entryPoints:
         - websecure
@@ -288,6 +295,10 @@ http:
       loadBalancer:
         servers:
           - url: http://beacon-qa-nginx:80
+    beacon-tools-nginx:
+      loadBalancer:
+        servers:
+          - url: http://beacon-tools-nginx:80
     beaconLibraryApi:
       loadBalancer:
         servers:
