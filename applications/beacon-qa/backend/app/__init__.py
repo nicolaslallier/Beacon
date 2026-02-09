@@ -1,0 +1,1 @@
+"""Beacon QA backend app."""

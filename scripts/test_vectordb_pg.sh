@@ -4,7 +4,7 @@ set -euo pipefail
 HOST_INPUT="${1:-beacon.famillelallier.net}"
 HOST="${HOST_INPUT#*://}"
 HOST="${HOST%%/*}"
-PORT="${2:-5432}"
+PORT="${2:-${VECTORDB_PUBLIC_PORT:-5432}}"
 DB="${VECTORDB_DB:-vectordb}"
 USER="${VECTORDB_USER:-vectordb}"
 PASS="${VECTORDB_PASSWORD:-change_me}"

@@ -21,6 +21,7 @@ services:
       - ${TECHNITIUM_DNS_SEARCH:-famillelallier.net}
     extra_hosts:
       - "lmstudio.beacon.famillelallier.net:host-gateway"
+      - "vectordb.beacon.famillelallier.net:host-gateway"
     expose:
       - "5678"
     volumes:

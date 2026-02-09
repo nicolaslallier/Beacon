@@ -134,6 +134,28 @@
         <div class="small">Health: <span id="health-n8n">checking…</span></div>
       </div>
 
+      <!-- Beacon QA -->
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="name">
+              <span id="status-qa" class="status" title="Checking…">⚪</span>
+              <span>Beacon QA</span>
+            </div>
+            <div class="url">https://qa.beacon.famillelallier.net/</div>
+          </div>
+        </div>
+
+        <a class="btn"
+           href="https://qa.beacon.famillelallier.net/"
+           target="_blank"
+           rel="noopener noreferrer">
+          Ouvrir Beacon QA ↗
+        </a>
+
+        <div class="small">Health: <span id="health-qa">checking…</span></div>
+      </div>
+
       <!-- pgAdmin -->
       <div class="card">
         <div class="row">
@@ -392,6 +414,7 @@
     // and are proxied by NGINX to the containers to avoid CORS.
     const services = [
       { key: "n8n", healthUrl: "/_health/n8n", okStatuses: new Set([200, 204]) },
+      { key: "qa", healthUrl: "/_health/qa", okStatuses: new Set([200, 204]) },
       { key: "pgadmin", healthUrl: "/_health/pgadmin", okStatuses: new Set([200, 204]) },
       { key: "grafana", healthUrl: "/_health/grafana", okStatuses: new Set([200, 204, 302]) },
       { key: "keycloak", healthUrl: "/_health/keycloak", okStatuses: new Set([200, 204]) },

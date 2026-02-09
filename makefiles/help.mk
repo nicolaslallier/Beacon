@@ -44,6 +44,12 @@ help:
 	$(call help_line,postgresql logs,Logs for PostgreSQL services)
 	$(call help_line,postgresql status,Status for PostgreSQL services)
 	$(call help_line,postgresql test,Run PostgreSQL readiness check)
+	@printf "### VectorDB (pgvector)\n"
+	$(call help_line,vectordb up,Start VectorDB services)
+	$(call help_line,vectordb down,Stop VectorDB services)
+	$(call help_line,vectordb logs,Logs for VectorDB services)
+	$(call help_line,vectordb status,Status for VectorDB services)
+	$(call help_line,vectordb test,Run VectorDB connectivity check)
 	@printf "### Redis\n"
 	$(call help_line,redis up,Start Redis services)
 	$(call help_line,redis down,Stop Redis services)

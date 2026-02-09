@@ -90,6 +90,13 @@ http:
       service: beacon-ollama-nginx
       tls: {}
 
+    beaconQa:
+      entryPoints:
+        - websecure
+      rule: Host(`qa.beacon.famillelallier.net`)
+      service: beacon-qa-nginx
+      tls: {}
+
     healthN8n:
       entryPoints:
         - websecure
@@ -97,6 +104,15 @@ http:
       service: n8n-nginx
       middlewares:
         - health-n8n
+      tls: {}
+
+    healthQa:
+      entryPoints:
+        - websecure
+      rule: Host(`beacon.famillelallier.net`) && Path(`/_health/qa`)
+      service: beacon-qa-nginx
+      middlewares:
+        - health-qa
       tls: {}
 
     healthPgadmin:
@@ -268,6 +284,10 @@ http:
       loadBalancer:
         servers:
           - url: http://beacon-ollama-nginx:80
+    beacon-qa-nginx:
+      loadBalancer:
+        servers:
+          - url: http://beacon-qa-nginx:80
     beaconLibraryApi:
       loadBalancer:
         servers:
@@ -315,6 +335,9 @@ http:
         customResponseHeaders:
           X-Frame-Options: "ALLOWALL"
     health-n8n:
+      replacePath:
+        path: /healthz
+    health-qa:
       replacePath:
         path: /healthz
     health-pgadmin:
@@ -366,8 +389,18 @@ tcp:
       service: postgresql
       tls:
         passthrough: true
+    vectordb:
+      entryPoints:
+        - vectordb
+      # Dedicated entrypoint; accept all without TLS passthrough.
+      rule: HostSNI(`*`)
+      service: vectordb
   services:
     postgresql:
       loadBalancer:
         servers:
           - address: postgresql-nginx:5432
+    vectordb:
+      loadBalancer:
+        servers:
+          - address: beacon-vectordb:5432

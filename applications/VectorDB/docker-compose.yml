@@ -9,10 +9,9 @@ services:
       POSTGRES_DB: ${VECTORDB_DB}
       POSTGRES_USER: ${VECTORDB_USER}
       POSTGRES_PASSWORD: ${VECTORDB_PASSWORD}
-    ports:
-      - "${VECTORDB_PORT:-5432}:5432"
     volumes:
       - vectordb-data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     networks:
       - nginx_net
       - monitoring_net

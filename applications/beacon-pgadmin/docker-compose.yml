@@ -15,6 +15,8 @@ services:
       - ${TECHNITIUM_DNS_IP:-172.29.0.53}
     dns_search:
       - ${TECHNITIUM_DNS_SEARCH:-famillelallier.net}
+    extra_hosts:
+      - "vectordb.beacon.famillelallier.net:host-gateway"
     expose:
       - "80"
     volumes:
