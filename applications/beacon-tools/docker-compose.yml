@@ -12,6 +12,7 @@ services:
       POSTGRES_USER: ${BEACON_TOOLS_DB_USER:-beacon_tools}
       POSTGRES_PASSWORD: ${BEACON_TOOLS_DB_PASSWORD:-change_me}
     volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
       - beacon_tools_postgres_data:/var/lib/postgresql/data
     networks:
       - beacon_tools_net
@@ -27,6 +28,25 @@ services:
       retries: 3
       start_period: 30s
 
+  beacon-tools-db-list:
+    build:
+      context: ./backend
+    container_name: beacon-tools-db-list
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      DB_HOST: beacon-tools-postgres
+      DB_PORT: 5432
+      DB_NAME: ${BEACON_TOOLS_DB_NAME:-beacon_tools}
+      DB_USER: ${BEACON_TOOLS_DB_USER:-beacon_tools}
+      DB_PASSWORD: ${BEACON_TOOLS_DB_PASSWORD:-change_me}
+    depends_on:
+      beacon-tools-postgres:
+        condition: service_healthy
+    networks:
+      - beacon_tools_net
+
   beacon-tools-frontend:
     build:
       context: ./frontend
@@ -35,8 +55,6 @@ services:
     environment:
       VITE_APP_NAME: Beacon Tools
     command: ["npm", "run", "dev", "--", "--host", "--port", "3011"]
-    ports:
-      - "3011:3011"
     volumes:
       - ./frontend:/app
       - beacon_tools_node_modules:/app/node_modules

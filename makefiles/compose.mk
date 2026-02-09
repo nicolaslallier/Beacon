@@ -45,6 +45,7 @@ docker-build:
 	up-toolsuite down-toolsuite toolsuite-logs toolsuite-status \
 	qa-up qa-down qa-logs qa-status qa-build qa \
 	tools-up tools-down tools-logs tools-status tools-build tools \
+	tools-db-init \
 	toolsuite-spa-sync \
 	vectordb-up vectordb-down vectordb-logs vectordb-status vectordb-test \
 	pgadmin-up pgadmin-down pgadmin-logs pgadmin-status pgadmin \
@@ -437,6 +438,13 @@ tools-logs:
 
 tools-status:
 	$(COMPOSE_BEACON_TOOLS) ps
+
+tools-db-init:
+	@echo "[Beacon Tools] Applying DB init scripts..."
+	$(COMPOSE_BEACON_TOOLS) up -d beacon-tools-postgres
+	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
+		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
+		-f /docker-entrypoint-initdb.d/00_list_databases.sql
 
 # --- Standalone pgAdmin targets ---
 pgadmin-up:
