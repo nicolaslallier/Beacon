@@ -1,6 +1,32 @@
 version: "3.8"
 
 services:
+  beacon-tools-postgres:
+    image: postgres:16-alpine
+    container_name: beacon-tools-postgres
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      POSTGRES_DB: ${BEACON_TOOLS_DB_NAME:-beacon_tools}
+      POSTGRES_USER: ${BEACON_TOOLS_DB_USER:-beacon_tools}
+      POSTGRES_PASSWORD: ${BEACON_TOOLS_DB_PASSWORD:-change_me}
+    volumes:
+      - beacon_tools_postgres_data:/var/lib/postgresql/data
+    networks:
+      - beacon_tools_net
+      - beacon_nginx_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${BEACON_TOOLS_DB_USER:-beacon_tools} -d ${BEACON_TOOLS_DB_NAME:-beacon_tools}",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   beacon-tools-frontend:
     build:
       context: ./frontend
@@ -39,6 +65,7 @@ services:
 
 volumes:
   beacon_tools_node_modules:
+  beacon_tools_postgres_data:
 
 networks:
   beacon_tools_net:

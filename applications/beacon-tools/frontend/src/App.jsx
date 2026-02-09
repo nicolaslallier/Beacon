@@ -16,6 +16,17 @@ const tools = [
   },
 ];
 
+const postgresDatabases = [
+  {
+    name: "Vector DB",
+    host: "vectordb.beacon.famillelallier.net",
+  },
+  {
+    name: "PostgreSQL",
+    host: "postgresql.beacon.famillelallier.net",
+  },
+];
+
 function App() {
   return (
     <div className="app">
@@ -54,6 +65,17 @@ function App() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="panel">
+        <h2>PostgreSQL databases</h2>
+        <ul className="list">
+          {postgresDatabases.map((database) => (
+            <li key={database.host}>
+              {database.name}: {database.host}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="panel">
