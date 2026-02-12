@@ -11,7 +11,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
       - MINIO_PROMETHEUS_AUTH_TYPE=public
-      - MINIO_SERVER_URL=${MINIO_SERVER_URL:-https://minio.beacon.famillelallier.net}
+      - MINIO_SERVER_URL=${MINIO_SERVER_URL:-http://minio1:9000}
       - MINIO_BROWSER_REDIRECT_URL=${MINIO_BROWSER_REDIRECT_URL:-https://minio.beacon.famillelallier.net/}
     volumes:
       - beacon_minio1-data:/data
@@ -38,7 +38,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
       - MINIO_PROMETHEUS_AUTH_TYPE=public
-      - MINIO_SERVER_URL=${MINIO_SERVER_URL:-https://minio.beacon.famillelallier.net}
+      - MINIO_SERVER_URL=${MINIO_SERVER_URL:-http://minio1:9000}
       - MINIO_BROWSER_REDIRECT_URL=${MINIO_BROWSER_REDIRECT_URL:-https://minio.beacon.famillelallier.net/}
     volumes:
       - beacon_minio2-data:/data
@@ -65,7 +65,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
       - MINIO_PROMETHEUS_AUTH_TYPE=public
-      - MINIO_SERVER_URL=${MINIO_SERVER_URL:-https://minio.beacon.famillelallier.net}
+      - MINIO_SERVER_URL=${MINIO_SERVER_URL:-http://minio1:9000}
       - MINIO_BROWSER_REDIRECT_URL=${MINIO_BROWSER_REDIRECT_URL:-https://minio.beacon.famillelallier.net/}
     volumes:
       - beacon_minio3-data:/data
@@ -102,7 +102,7 @@ services:
       - nginx_net
       - minio_net
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/healthz || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

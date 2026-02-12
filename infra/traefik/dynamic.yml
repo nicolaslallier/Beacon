@@ -406,6 +406,11 @@ tcp:
       # Dedicated entrypoint; accept all without TLS passthrough.
       rule: HostSNI(`*`)
       service: vectordb
+    postgres-tools:
+      entryPoints:
+        - postgres-tools
+      rule: HostSNI(`*`)
+      service: postgres-tools
   services:
     postgresql:
       loadBalancer:
@@ -415,3 +420,7 @@ tcp:
       loadBalancer:
         servers:
           - address: beacon-vectordb:5432
+    postgres-tools:
+      loadBalancer:
+        servers:
+          - address: beacon-tools-postgres-nginx:5432

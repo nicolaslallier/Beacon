@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+  beacon-docx-md-backend:
+    build:
+      context: ./backend
+      target: dev
+    container_name: beacon-docx-md-backend
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      ENV: ${ENV:-local}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "8220:8000"
+    volumes:
+      - ./backend/app:/app/app
+    networks:
+      - beacon_docx_md_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  beacon-docx-md-frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: beacon-docx-md-frontend
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-/api}
+    command: ["npm", "run", "dev", "--", "--host", "--port", "3020"]
+    ports:
+      - "3020:3020"
+    volumes:
+      - ./frontend:/app
+      - beacon_docx_md_node_modules:/app/node_modules
+    depends_on:
+      beacon-docx-md-backend:
+        condition: service_healthy
+    networks:
+      - beacon_docx_md_net
+
+  beacon-docx-md-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-docx-md-nginx
+    restart: unless-stopped
+    environment:
+      DOCX_MD_SERVER_NAME: ${DOCX_MD_SERVER_NAME:-tools.beacon.famillelallier.net}
+      DOCX_MD_FRONTEND_HOST: beacon-docx-md-frontend
+      DOCX_MD_FRONTEND_PORT: 3020
+      DOCX_MD_BACKEND_HOST: beacon-docx-md-backend
+      DOCX_MD_BACKEND_PORT: 8000
+      DOLLAR: $$
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      beacon-docx-md-backend:
+        condition: service_healthy
+      beacon-docx-md-frontend:
+        condition: service_started
+    expose:
+      - "80"
+    networks:
+      - beacon_docx_md_net
+      - beacon_nginx_net
+
+volumes:
+  beacon_docx_md_node_modules:
+
+networks:
+  beacon_docx_md_net:
+    name: beacon_docx_md_net
+  beacon_nginx_net:
+    external: true
+    name: beacon_nginx_net

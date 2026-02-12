@@ -6,5 +6,12 @@ export default defineConfig({
   server: {
     port: 3011,
     allowedHosts: ["tools.beacon.famillelallier.net"],
+    proxy: {
+      "/api/minio": {
+        target: "http://beacon-tools-minio:8000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/minio\/?/, "/"),
+      },
+    },
   },
 });

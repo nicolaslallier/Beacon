@@ -32,6 +32,7 @@ services:
       - "${TRAEFIK_HTTPS_PORT:-443}:443"
       - "${TRAEFIK_POSTGRES_PORT:-5432}:5432"
       - "${TRAEFIK_VECTORDB_PORT:-5433}:5433"
+      - "${TRAEFIK_POSTGRES_TOOLS_PORT:-5434}:5434"
     expose:
       - "9100"
     networks:
@@ -42,6 +43,7 @@ services:
           - pgadmin.beacon.famillelallier.net
           - postgresql.beacon.famillelallier.net
           - beacon-ollama.beacon.famillelallier.net
+          - beacon-tools.db.beacon.famillelallier.net
       monitoring_net: null
       beacon_library_net: null
       beacon_n8n_net: null

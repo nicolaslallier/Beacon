@@ -445,6 +445,15 @@ tools-db-init:
 	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
 		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
 		-f /docker-entrypoint-initdb.d/00_list_databases.sql
+	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
+		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
+		-f /docker-entrypoint-initdb.d/01_connection_strings.sql
+	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
+		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
+		-f /docker-entrypoint-initdb.d/02_rag_ingestion_status.sql
+	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
+		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
+		-f /docker-entrypoint-initdb.d/03_image_analysis.sql
 
 # --- Standalone pgAdmin targets ---
 pgadmin-up:

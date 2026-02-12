@@ -14,6 +14,8 @@ entryPoints:
     address: ":5432"
   vectordb:
     address: ":5433"
+  postgres-tools:
+    address: ":5434"
 
 api:
   dashboard: false

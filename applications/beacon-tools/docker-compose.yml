@@ -41,19 +41,113 @@ services:
       DB_NAME: ${BEACON_TOOLS_DB_NAME:-beacon_tools}
       DB_USER: ${BEACON_TOOLS_DB_USER:-beacon_tools}
       DB_PASSWORD: ${BEACON_TOOLS_DB_PASSWORD:-change_me}
+      BEACON_TOOLS_DB_ENCRYPTION_KEY: ${BEACON_TOOLS_DB_ENCRYPTION_KEY:-change_me}
+      TOOLS_KEYCLOAK_ISSUER: ${TOOLS_KEYCLOAK_ISSUER:-}
+      TOOLS_KEYCLOAK_JWKS_URL: ${TOOLS_KEYCLOAK_JWKS_URL:-}
+      TOOLS_KEYCLOAK_AUDIENCE: ${TOOLS_KEYCLOAK_AUDIENCE:-}
+      TOOLS_TRAEFIK_HOST: ${TOOLS_TRAEFIK_HOST:-postgresql.beacon.famillelallier.net}
+      TOOLS_TRAEFIK_POSTGRES_PORT: ${TOOLS_TRAEFIK_POSTGRES_PORT:-5432}
+      TOOLS_TRAEFIK_VECTORDB_PORT: ${TOOLS_TRAEFIK_VECTORDB_PORT:-5433}
     depends_on:
       beacon-tools-postgres:
         condition: service_healthy
     networks:
       - beacon_tools_net
+      - beacon_nginx_net
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+
+  beacon-tools-rag:
+    build:
+      context: ./rag-api
+    container_name: beacon-tools-rag
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
+      VECTORDB_HOST: ${VECTORDB_HOST:-vectordb}
+      VECTORDB_PORT: ${VECTORDB_PORT:-5432}
+      VECTORDB_DB: ${VECTORDB_DB:-vectordb}
+      VECTORDB_USER: ${VECTORDB_USER:-vectordb}
+      VECTORDB_PASSWORD: ${VECTORDB_PASSWORD:-change_me}
+      TOOLS_MINIO_API_BASE: ${TOOLS_MINIO_API_BASE:-http://beacon-tools-minio:8000}
+      TOOLS_KEYCLOAK_ISSUER: ${TOOLS_KEYCLOAK_ISSUER:-}
+      TOOLS_KEYCLOAK_JWKS_URL: ${TOOLS_KEYCLOAK_JWKS_URL:-}
+      TOOLS_KEYCLOAK_AUDIENCE: ${TOOLS_KEYCLOAK_AUDIENCE:-}
+    depends_on:
+      beacon-tools-minio:
+        condition: service_started
+    networks:
+      - beacon_tools_net
+      - beacon_nginx_net
+      - beacon_redis_net
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+
+  beacon-tools-image-ai:
+    build:
+      context: ./image-ai
+    container_name: beacon-tools-image-ai
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      BEACON_TOOLS_DB_HOST: beacon-tools-postgres
+      BEACON_TOOLS_DB_PORT: 5432
+      BEACON_TOOLS_DB_NAME: ${BEACON_TOOLS_DB_NAME:-beacon_tools}
+      BEACON_TOOLS_DB_USER: ${BEACON_TOOLS_DB_USER:-beacon_tools}
+      BEACON_TOOLS_DB_PASSWORD: ${BEACON_TOOLS_DB_PASSWORD:-change_me}
+      TOOLS_MINIO_API_BASE: ${TOOLS_MINIO_API_BASE:-http://beacon-tools-minio:8000}
+      LLM_STUDIO_BASE_URL: ${LLM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      LLM_STUDIO_MODEL: ${LLM_STUDIO_MODEL:-qwen3-vl-30B}
+      TOOLS_KEYCLOAK_ISSUER: ${TOOLS_KEYCLOAK_ISSUER:-}
+      TOOLS_KEYCLOAK_JWKS_URL: ${TOOLS_KEYCLOAK_JWKS_URL:-}
+      TOOLS_KEYCLOAK_AUDIENCE: ${TOOLS_KEYCLOAK_AUDIENCE:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      beacon-tools-postgres:
+        condition: service_healthy
+      beacon-tools-minio:
+        condition: service_started
+    networks:
+      - beacon_tools_net
+      - beacon_nginx_net
+    dns:
+      - ${TECHNITIUM_DNS_IP:-172.29.0.53}
+
+  beacon-tools-minio:
+    build:
+      context: ./minio-api
+    container_name: beacon-tools-minio
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio1:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKET:-}
+    networks:
+      - beacon_tools_net
+      - beacon_minio_net
 
   beacon-tools-frontend:
     build:
       context: ./frontend
       target: dev
     container_name: beacon-tools-frontend
+    env_file:
+      - ./.env
     environment:
       VITE_APP_NAME: Beacon Tools
+      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
+      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-}
+      VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-}
+      VITE_TOOLS_API_BASE: ${VITE_TOOLS_API_BASE:-/api/tools}
     command: ["npm", "run", "dev", "--", "--host", "--port", "3011"]
     volumes:
       - ./frontend:/app
@@ -81,6 +175,28 @@ services:
       - beacon_tools_net
       - beacon_nginx_net
 
+  beacon-tools-postgres-nginx:
+    image: nginx:1.27-alpine
+    container_name: beacon-tools-postgres-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/postgres-stream.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      beacon-tools-postgres:
+        condition: service_healthy
+    expose:
+      - "80"
+      - "5432"
+    networks:
+      - beacon_tools_net
+      - beacon_nginx_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   beacon_tools_node_modules:
   beacon_tools_postgres_data:
@@ -91,3 +207,9 @@ networks:
   beacon_nginx_net:
     external: true
     name: beacon_nginx_net
+  beacon_redis_net:
+    external: true
+    name: beacon_redis_net
+  beacon_minio_net:
+    external: true
+    name: beacon_minio_net
