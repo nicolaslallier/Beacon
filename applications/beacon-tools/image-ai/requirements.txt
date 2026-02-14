@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-psycopg[binary]
-httpx
-python-jose[cryptography]
-pydantic
-openai

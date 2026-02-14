@@ -3598,7 +3598,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "probe_success{job=\"blackbox-tcp\",instance=\"keycloak-db:5432\"}",
+          "expr": "probe_success{job=\"blackbox-tcp\",instance=\"infra-keycloak-db:5432\"}",
           "refId": "A"
         }
       ],
@@ -3662,7 +3662,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "probe_duration_seconds{job=\"blackbox-tcp\",instance=\"keycloak-db:5432\"}",
+          "expr": "probe_duration_seconds{job=\"blackbox-tcp\",instance=\"infra-keycloak-db:5432\"}",
           "refId": "A"
         }
       ],

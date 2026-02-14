@@ -4,10 +4,10 @@ set -euo pipefail
 HOST_INPUT="${1:-beacon.famillelallier.net}"
 HOST="${HOST_INPUT#*://}"
 HOST="${HOST%%/*}"
-PORT="${2:-${VECTORDB_PUBLIC_PORT:-5432}}"
-DB="${VECTORDB_DB:-vectordb}"
-USER="${VECTORDB_USER:-vectordb}"
-PASS="${VECTORDB_PASSWORD:-change_me}"
+PORT="${2:-${BEACON_VECTORDB_PUBLIC_PORT:-${VECTORDB_PUBLIC_PORT:-5432}}}"
+DB="${BEACON_VECTORDB_DB:-${VECTORDB_DB:-vectordb}}"
+USER="${BEACON_VECTORDB_USER:-${VECTORDB_USER:-vectordb}}"
+PASS="${BEACON_VECTORDB_PASSWORD:-${VECTORDB_PASSWORD:-change_me}}"
 
 if [[ -z "${PASS}" ]]; then
   read -s -p "Password for ${USER}@${HOST_INPUT}: " PASS
@@ -55,7 +55,7 @@ fi
 echo
 
 echo "== Debug: Docker psql test (bridge -> host) =="
-BRIDGE_HOST="${VECTORDB_BRIDGE_HOST:-host.docker.internal}"
+BRIDGE_HOST="${BEACON_VECTORDB_BRIDGE_HOST:-${VECTORDB_BRIDGE_HOST:-host.docker.internal}}"
 RUN_CMD=(docker run --rm --add-host=host.docker.internal:host-gateway -e PGPASSWORD="${PASS}" -e PGCONNECT_TIMEOUT=5 postgres:18-alpine \
   psql -h "${BRIDGE_HOST}" -p "${PORT}" -U "${USER}" -d "${DB}" \
   -v ON_ERROR_STOP=1 -c "select version(), now(), 1 as ok;")

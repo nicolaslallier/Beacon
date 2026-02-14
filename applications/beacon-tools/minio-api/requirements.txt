@@ -1,4 +1,0 @@
-fastapi
-uvicorn[standard]
-minio
-python-multipart

@@ -400,12 +400,12 @@ tcp:
       service: postgresql
       tls:
         passthrough: true
-    vectordb:
+    beacon-vectordb:
       entryPoints:
-        - vectordb
+        - beacon-vectordb
       # Dedicated entrypoint; accept all without TLS passthrough.
       rule: HostSNI(`*`)
-      service: vectordb
+      service: beacon-vectordb
     postgres-tools:
       entryPoints:
         - postgres-tools
@@ -416,7 +416,7 @@ tcp:
       loadBalancer:
         servers:
           - address: postgresql-nginx:5432
-    vectordb:
+    beacon-vectordb:
       loadBalancer:
         servers:
           - address: beacon-vectordb:5432

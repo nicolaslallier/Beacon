@@ -47,6 +47,7 @@ docker-build:
 	tools-up tools-down tools-logs tools-status tools-build tools \
 	tools-db-init \
 	toolsuite-spa-sync \
+	beacon-vectordb-up beacon-vectordb-down beacon-vectordb-logs beacon-vectordb-status beacon-vectordb-test \
 	vectordb-up vectordb-down vectordb-logs vectordb-status vectordb-test \
 	pgadmin-up pgadmin-down pgadmin-logs pgadmin-status pgadmin \
 	monitoring-up monitoring-down monitoring-logs-app monitoring-status-app monitoring \
@@ -943,35 +944,74 @@ test:
 	@:
 endif
 
-# --- VectorDB targets ---
+# --- Beacon-VectorDB targets ---
+beacon-vectordb-up:
+	$(COMPOSE_BEACON_VECTORDB) up -d
+
+beacon-vectordb-down:
+	$(COMPOSE_BEACON_VECTORDB) down
+
+beacon-vectordb-logs:
+	$(COMPOSE_BEACON_VECTORDB) logs -f
+
+beacon-vectordb-status:
+	$(COMPOSE_BEACON_VECTORDB) ps
+
+beacon-vectordb-test:
+	@set -a; \
+	  . $(BEACON_VECTORDB_DIR)/.env; \
+	  set +a; \
+	  PGPASSWORD=$${BEACON_VECTORDB_PASSWORD:-$$VECTORDB_PASSWORD} psql -h $(BEACON_VECTORDB_HOST) -p $${BEACON_VECTORDB_PUBLIC_PORT:-$${VECTORDB_PUBLIC_PORT:-5432}} -U $${BEACON_VECTORDB_USER:-$$VECTORDB_USER} -d $${BEACON_VECTORDB_DB:-$$VECTORDB_DB} -c "$(BEACON_VECTORDB_QUERY)"
+
+# --- Namespaced targets (make beacon-vectordb up|down|logs|log|status|test) ---
+ifneq (,$(filter beacon-vectordb,$(MAKECMDGOALS)))
+beacon-vectordb:
+	@case "$(word 2,$(MAKECMDGOALS))" in \
+	  up) $(MAKE) beacon-vectordb-up ;; \
+	  down) $(MAKE) beacon-vectordb-down ;; \
+	  logs) $(MAKE) beacon-vectordb-logs ;; \
+	  log) $(MAKE) beacon-vectordb-logs ;; \
+	  status) $(MAKE) beacon-vectordb-status ;; \
+	  test) $(MAKE) beacon-vectordb-test ;; \
+	  *) echo "Usage: make beacon-vectordb {up|down|logs|log|status|test}"; exit 2 ;; \
+	esac
+
+status:
+	@:
+
+log:
+	@:
+
+test:
+	@:
+endif
+
+# --- VectorDB targets (alias for beacon-vectordb) ---
 vectordb-up:
-	$(COMPOSE_VECTORDB) up -d
+	$(MAKE) beacon-vectordb-up
 
 vectordb-down:
-	$(COMPOSE_VECTORDB) down
+	$(MAKE) beacon-vectordb-down
 
 vectordb-logs:
-	$(COMPOSE_VECTORDB) logs -f
+	$(MAKE) beacon-vectordb-logs
 
 vectordb-status:
-	$(COMPOSE_VECTORDB) ps
+	$(MAKE) beacon-vectordb-status
 
 vectordb-test:
-	@set -a; \
-	  . $(VECTORDB_DIR)/.env; \
-	  set +a; \
-	  PGPASSWORD=$$VECTORDB_PASSWORD psql -h $(VECTORDB_HOST) -p $${VECTORDB_PUBLIC_PORT:-$${VECTORDB_PORT:-5432}} -U $$VECTORDB_USER -d $$VECTORDB_DB -c "$(VECTORDB_QUERY)"
+	$(MAKE) beacon-vectordb-test
 
-# --- Namespaced targets (make vectordb up|down|logs|log|status|test) ---
+# --- Namespaced targets (make vectordb up|down|logs|log|status|test) - alias ---
 ifneq (,$(filter vectordb,$(MAKECMDGOALS)))
 vectordb:
 	@case "$(word 2,$(MAKECMDGOALS))" in \
-	  up) $(MAKE) vectordb-up ;; \
-	  down) $(MAKE) vectordb-down ;; \
-	  logs) $(MAKE) vectordb-logs ;; \
-	  log) $(MAKE) vectordb-logs ;; \
-	  status) $(MAKE) vectordb-status ;; \
-	  test) $(MAKE) vectordb-test ;; \
+	  up) $(MAKE) beacon-vectordb-up ;; \
+	  down) $(MAKE) beacon-vectordb-down ;; \
+	  logs) $(MAKE) beacon-vectordb-logs ;; \
+	  log) $(MAKE) beacon-vectordb-logs ;; \
+	  status) $(MAKE) beacon-vectordb-status ;; \
+	  test) $(MAKE) beacon-vectordb-test ;; \
 	  *) echo "Usage: make vectordb {up|down|logs|log|status|test}"; exit 2 ;; \
 	esac
 

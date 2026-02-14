@@ -1,43 +1,45 @@
 services:
-  vectordb:
+  beacon-vectordb:
     image: pgvector/pgvector:pg18
     container_name: beacon-vectordb
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      POSTGRES_DB: ${VECTORDB_DB}
-      POSTGRES_USER: ${VECTORDB_USER}
-      POSTGRES_PASSWORD: ${VECTORDB_PASSWORD}
+      POSTGRES_DB: ${BEACON_VECTORDB_DB:-${VECTORDB_DB:-vectordb}}
+      POSTGRES_USER: ${BEACON_VECTORDB_USER:-${VECTORDB_USER:-vectordb}}
+      POSTGRES_PASSWORD: ${BEACON_VECTORDB_PASSWORD:-${VECTORDB_PASSWORD:-change_me}}
     volumes:
       - vectordb-data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d:ro
     networks:
-      - nginx_net
-      - monitoring_net
+      nginx_net:
+        aliases:
+          - vectordb
+      monitoring_net: {}
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${VECTORDB_USER} -d ${VECTORDB_DB} -p ${VECTORDB_PORT:-5432}",
+          "pg_isready -U ${BEACON_VECTORDB_USER:-${VECTORDB_USER:-vectordb}} -d ${BEACON_VECTORDB_DB:-${VECTORDB_DB:-vectordb}} -p ${BEACON_VECTORDB_PORT:-${VECTORDB_PORT:-5432}}",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
 
-  vectordb-exporter:
+  beacon-vectordb-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     container_name: beacon-vectordb-exporter
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      DATA_SOURCE_NAME: postgresql://${VECTORDB_USER}:${VECTORDB_PASSWORD}@vectordb:${VECTORDB_PORT:-5432}/${VECTORDB_DB}?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://${BEACON_VECTORDB_USER:-${VECTORDB_USER:-vectordb}}:${BEACON_VECTORDB_PASSWORD:-${VECTORDB_PASSWORD:-change_me}}@beacon-vectordb:${BEACON_VECTORDB_PORT:-${VECTORDB_PORT:-5432}}/${BEACON_VECTORDB_DB:-${VECTORDB_DB:-vectordb}}?sslmode=disable
     expose:
       - "9187"
     depends_on:
-      vectordb:
+      beacon-vectordb:
         condition: service_healthy
     networks:
       - nginx_net

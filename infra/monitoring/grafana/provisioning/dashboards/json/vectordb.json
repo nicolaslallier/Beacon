@@ -92,11 +92,11 @@
             "type": "prometheus",
             "uid": "$prometheus"
           },
-          "expr": "up{job=\"vectordb-postgres\"}",
+          "expr": "up{job=\"beacon-vectordb-postgres\"}",
           "refId": "A"
         }
       ],
-      "title": "VectorDB Exporter",
+      "title": "Beacon-VectorDB Exporter",
       "type": "stat"
     },
     {
@@ -454,7 +454,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "VectorDB",
+  "title": "Beacon-VectorDB",
   "uid": "vectordb",
   "version": 1,
   "weekStart": ""
