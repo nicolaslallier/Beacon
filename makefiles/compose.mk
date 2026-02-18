@@ -46,6 +46,7 @@ docker-build:
 	qa-up qa-down qa-logs qa-status qa-build qa \
 	tools-up tools-down tools-logs tools-status tools-build tools \
 	tools-db-init \
+	thor-up thor-down thor-logs thor-status thor-build thor \
 	toolsuite-spa-sync \
 	beacon-vectordb-up beacon-vectordb-down beacon-vectordb-logs beacon-vectordb-status beacon-vectordb-test \
 	vectordb-up vectordb-down vectordb-logs vectordb-status vectordb-test \
@@ -94,6 +95,12 @@ endif
 ifneq (,$(filter tools,$(MAKECMDGOALS)))
 TOOLS_MODE := 1
 endif
+ifneq (,$(filter thor,$(MAKECMDGOALS)))
+THOR_MODE := 1
+endif
+ifneq (,$(filter frey,$(MAKECMDGOALS)))
+FREY_MODE := 1
+endif
 ifneq (,$(filter minio,$(MAKECMDGOALS)))
 MINIO_MODE := 1
 endif
@@ -126,7 +133,7 @@ BEACON_OLLAMA_MODE := 1
 endif
 
 up:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) up -d; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ] || [ -n "$(FREY_MODE)" ] || [ -n "$(THOR_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) up -d; $(MAKE) tools-up; fi
 
 # Start only core edge services
 up-core:
@@ -152,16 +159,16 @@ test-edge:
 	$(MAKE) lint-nginx
 
 down:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) down; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ] || [ -n "$(FREY_MODE)" ] || [ -n "$(THOR_MODE)" ]; then :; else $(MAKE) tools-down; $(COMPOSE_MONITORING_AUTH) down; fi
 
 restart:
 	$(COMPOSE_MONITORING_AUTH) up -d --force-recreate
 
 logs:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) logs -f; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ] || [ -n "$(FREY_MODE)" ] || [ -n "$(THOR_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) logs -f; fi
 
 ps:
-	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) ps; fi
+	@if [ -n "$(INFRA_PGADMIN_MODE)" ] || [ -n "$(INFRA_DNS_MODE)" ] || [ -n "$(INFRA_KEYCLOAK_MODE)" ] || [ -n "$(INFRA_EDGE_MODE)" ] || [ -n "$(PGADMIN_APP_MODE)" ] || [ -n "$(N8N_MODE)" ] || [ -n "$(QA_MODE)" ] || [ -n "$(TOOLS_MODE)" ] || [ -n "$(MINIO_MODE)" ] || [ -n "$(POSTGRESQL_MODE)" ] || [ -n "$(REDIS_MODE)" ] || [ -n "$(MAILHOG_MODE)" ] || [ -n "$(SUPABASE_MODE)" ] || [ -n "$(CHROMADB_MODE)" ] || [ -n "$(GOTENBERG_MODE)" ] || [ -n "$(MONITORING_APP_MODE)" ] || [ -n "$(GRAFANA_MODE)" ] || [ -n "$(BEACON_OLLAMA_MODE)" ] || [ -n "$(FREY_MODE)" ] || [ -n "$(THOR_MODE)" ]; then :; else $(COMPOSE_MONITORING_AUTH) ps; fi
 
 # --- Monitoring targets ---
 up-monitoring:
@@ -440,6 +447,22 @@ tools-logs:
 tools-status:
 	$(COMPOSE_BEACON_TOOLS) ps
 
+# --- Thor (Beacon Tools backend) targets ---
+thor-up:
+	$(COMPOSE_BEACON_TOOLS) up -d --build
+
+thor-down:
+	$(COMPOSE_BEACON_TOOLS) down
+
+thor-build:
+	$(COMPOSE_BEACON_TOOLS) build
+
+thor-logs:
+	$(COMPOSE_BEACON_TOOLS) logs -f
+
+thor-status:
+	$(COMPOSE_BEACON_TOOLS) ps
+
 tools-db-init:
 	@echo "[Beacon Tools] Applying DB init scripts..."
 	$(COMPOSE_BEACON_TOOLS) up -d beacon-tools-postgres
@@ -455,6 +478,9 @@ tools-db-init:
 	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
 		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
 		-f /docker-entrypoint-initdb.d/03_image_analysis.sql
+	$(COMPOSE_BEACON_TOOLS) exec -T beacon-tools-postgres \
+		psql -U "$${POSTGRES_USER:-beacon_tools}" -d "$${POSTGRES_DB:-beacon_tools}" \
+		-f /docker-entrypoint-initdb.d/04_image_rag_ingestion_status.sql
 
 # --- Standalone pgAdmin targets ---
 pgadmin-up:
@@ -516,6 +542,29 @@ tools:
 	  status) $(MAKE) tools-status ;; \
 	  build) $(MAKE) tools-build ;; \
 	  *) echo "Usage: make tools {up|down|logs|log|status|build}"; exit 2 ;; \
+	esac
+
+status:
+	@:
+
+log:
+	@:
+
+build:
+	@:
+endif
+
+# --- Namespaced targets (make thor up|down|logs|log|status|build) ---
+ifneq (,$(filter thor,$(MAKECMDGOALS)))
+thor:
+	@case "$(word 2,$(MAKECMDGOALS))" in \
+	  up) $(MAKE) thor-up ;; \
+	  down) $(MAKE) thor-down ;; \
+	  logs) $(MAKE) thor-logs ;; \
+	  log) $(MAKE) thor-logs ;; \
+	  status) $(MAKE) thor-status ;; \
+	  build) $(MAKE) thor-build ;; \
+	  *) echo "Usage: make thor {up|down|logs|log|status|build}"; exit 2 ;; \
 	esac
 
 status:
@@ -962,6 +1011,11 @@ beacon-vectordb-test:
 	  . $(BEACON_VECTORDB_DIR)/.env; \
 	  set +a; \
 	  PGPASSWORD=$${BEACON_VECTORDB_PASSWORD:-$$VECTORDB_PASSWORD} psql -h $(BEACON_VECTORDB_HOST) -p $${BEACON_VECTORDB_PUBLIC_PORT:-$${VECTORDB_PUBLIC_PORT:-5432}} -U $${BEACON_VECTORDB_USER:-$$VECTORDB_USER} -d $${BEACON_VECTORDB_DB:-$$VECTORDB_DB} -c "$(BEACON_VECTORDB_QUERY)"
+
+vectordb-image-rag-init:
+	@echo "[Beacon VectorDB] Applying Image RAG schema (core.rag_images)..."
+	$(COMPOSE_BEACON_VECTORDB) exec -T beacon-vectordb \
+		sh -c 'psql -U "$${POSTGRES_USER:-vectordb}" -d "$${POSTGRES_DB:-vectordb}" -f /docker-entrypoint-initdb.d/03_image_rag.sql'
 
 # --- Namespaced targets (make beacon-vectordb up|down|logs|log|status|test) ---
 ifneq (,$(filter beacon-vectordb,$(MAKECMDGOALS)))

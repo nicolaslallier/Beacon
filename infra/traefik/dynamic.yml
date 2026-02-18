@@ -32,6 +32,13 @@ http:
       service: minio-nginx
       tls: {}
 
+    minioS3:
+      entryPoints:
+        - websecure
+      rule: Host(`s3.beacon.famillelallier.net`)
+      service: minio-nginx
+      tls: {}
+
     redis:
       entryPoints:
         - websecure
@@ -58,6 +65,8 @@ http:
         - websecure
       rule: Host(`keycloak.beacon.famillelallier.net`)
       service: keycloak
+      middlewares:
+        - keycloak-csp
       tls: {}
 
     grafana:
@@ -344,6 +353,18 @@ http:
       headers:
         contentSecurityPolicy: "frame-ancestors 'self' https://beacon.famillelallier.net"
         customResponseHeaders:
+          X-Frame-Options: "ALLOWALL"
+    # Keycloak security headers.
+    # This middleware is referenced by the `keycloak` router above. Keep it defined
+    # so the router loads correctly even if we later adjust policies.
+    keycloak-csp:
+      headers:
+        # Allow Keycloak to be embedded by trusted frontends for silent SSO / 3p-cookies checks.
+        # Tighten/extend this list as you add/remove frontends.
+        contentSecurityPolicy: "frame-ancestors 'self' https://tools.beacon.famillelallier.net http://localhost:3011"
+        customResponseHeaders:
+          # Keycloak ships with SAMEORIGIN by default; override to allow iframe-based flows.
+          # CSP `frame-ancestors` remains the primary control.
           X-Frame-Options: "ALLOWALL"
     health-n8n:
       replacePath:

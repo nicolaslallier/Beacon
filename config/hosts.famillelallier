@@ -1,0 +1,47 @@
+# =============================================================================
+# Hosts file for famillelallier.net local development
+# =============================================================================
+# Usage: Append to /etc/hosts (macOS/Linux) or C:\Windows\System32\drivers\etc\hosts (Windows)
+#   sudo cat config/hosts.famillelallier >> /etc/hosts
+#
+# Replace 192.168.2.35 with your actual host IP if services run on another machine
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Beacon stack (Traefik)
+# -----------------------------------------------------------------------------
+192.168.2.35    beacon.famillelallier.net
+192.168.2.35    beacon-library.famillelallier.net
+192.168.2.35 n8n.beacon.famillelallier.net
+192.168.2.35 pgadmin.beacon.famillelallier.net
+192.168.2.35 postgresql.beacon.famillelallier.net
+192.168.2.35 beacon-ollama.beacon.famillelallier.net
+192.168.2.35 beacon-tools.db.beacon.famillelallier.net
+192.168.2.35 beacon-ollama-webui.beacon.famillelallier.net
+192.168.2.35 minio.beacon.famillelallier.net
+192.168.2.35 s3.beacon.famillelallier.net
+192.168.2.35 redis.beacon.famillelallier.net
+192.168.2.35 supabase.beacon.famillelallier.net
+192.168.2.35 chromadb.beacon.famillelallier.net
+192.168.2.35 keycloak.beacon.famillelallier.net
+192.168.2.35 grafana.beacon.famillelallier.net
+192.168.2.35 qa.beacon.famillelallier.net
+192.168.2.35 tools.beacon.famillelallier.net
+
+# -----------------------------------------------------------------------------
+# Dev infrastructure stack (nginx-front)
+# -----------------------------------------------------------------------------
+192.168.2.35 grafana.dev.famillelallier.net
+192.168.2.35 prometheus.dev.famillelallier.net
+192.168.2.35 minio.dev.famillelallier.net
+192.168.2.35 s3.dev.famillelallier.net
+192.168.2.35 postgres.dev.famillelallier.net
+192.168.2.35 redis.dev.famillelallier.net
+192.168.2.35 docs.dev.famillelallier.net
+192.168.2.35 nginx.dev.famillelallier.net
+
+# -----------------------------------------------------------------------------
+# Other
+# -----------------------------------------------------------------------------
+192.168.2.35 portainer.famillelallier.net
+192.168.2.35 graphql.dev.famillelallier.net

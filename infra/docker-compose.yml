@@ -65,11 +65,11 @@ services:
     environment:
       # Core OAuth2 settings - loaded from env_file, these provide defaults only
       OAUTH2_PROXY_PROVIDER: keycloak-oidc
-      OAUTH2_PROXY_OIDC_ISSUER_URL: http://beacon-keycloak:8080/realms/beacon
+      OAUTH2_PROXY_OIDC_ISSUER_URL: http://infra-keycloak:8080/realms/beacon
       OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
       OAUTH2_PROXY_LOGIN_URL: https://keycloak.beacon.famillelallier.net/realms/beacon/protocol/openid-connect/auth
-      OAUTH2_PROXY_REDEEM_URL: http://beacon-keycloak:8080/realms/beacon/protocol/openid-connect/token
-      OAUTH2_PROXY_OIDC_JWKS_URL: http://beacon-keycloak:8080/realms/beacon/protocol/openid-connect/certs
+      OAUTH2_PROXY_REDEEM_URL: http://infra-keycloak:8080/realms/beacon/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: http://infra-keycloak:8080/realms/beacon/protocol/openid-connect/certs
       OAUTH2_PROXY_REDIRECT_URL: https://beacon-library.famillelallier.net/oauth2/callback
       OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"
       OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION: "true"
@@ -134,7 +134,7 @@ services:
       - POSTGRES_USER=${KEYCLOAK_DB_USER:-keycloak}
       - POSTGRES_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
-      - beacon_keycloak-db-data:/var/lib/postgresql/data
+      - infra-keycloak-db-data:/var/lib/postgresql/data
     networks:
       - keycloak_net
       - monitoring_net
@@ -150,7 +150,7 @@ services:
       start_period: 30s
 
   infra-keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.2.3
     profiles: [auth]
     container_name: infra-keycloak
     restart: unless-stopped
@@ -167,6 +167,9 @@ services:
       # Admin credentials
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Keycloak 26+ bootstrap admin credentials (keep in sync with KEYCLOAK_ADMIN*)
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_ADMIN:-admin}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       # Proxy configuration (behind NGINX reverse proxy with SSL termination)
       - KC_PROXY=edge
       - KC_PROXY_HEADERS=xforwarded
@@ -182,8 +185,13 @@ services:
       # Health and metrics
       - KC_HEALTH_ENABLED=true
       - KC_METRICS_ENABLED=true
+      - KC_HTTP_MANAGEMENT_HOST=0.0.0.0
+      - KC_HTTP_MANAGEMENT_PORT=9000
       # Logging
       - KC_LOG_LEVEL=${KEYCLOAK_LOG_LEVEL:-info}
+    expose:
+      - "8080"
+      - "9000"
     networks:
       - keycloak_net
       - nginx_net

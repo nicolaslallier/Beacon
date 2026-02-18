@@ -3,9 +3,10 @@ map ${DOLLAR}http_upgrade ${DOLLAR}connection_upgrade {
   "" close;
 }
 
+# Console host (UI-first)
 server {
   listen 80;
-  server_name ${MINIO_SERVER_NAME};
+  server_name ${MINIO_CONSOLE_SERVER_NAME};
 
   client_max_body_size 0;
 
@@ -36,6 +37,38 @@ server {
   # Optional S3 API via /minio/ path
   location ^~ /minio/ {
     rewrite ^/minio/?(.*)$ /${DOLLAR}1 break;
+    proxy_pass http://${MINIO_S3_UPSTREAM_HOST}:${MINIO_S3_UPSTREAM_PORT};
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              ${DOLLAR}host;
+    proxy_set_header X-Real-IP         ${DOLLAR}remote_addr;
+    proxy_set_header X-Forwarded-For   ${DOLLAR}proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+
+    proxy_set_header Upgrade           ${DOLLAR}http_upgrade;
+    proxy_set_header Connection        ${DOLLAR}connection_upgrade;
+  }
+}
+
+# S3 host (API-first) for clients like n8n/AWS SDK
+server {
+  listen 80;
+  server_name ${MINIO_S3_SERVER_NAME};
+
+  client_max_body_size 0;
+
+  location = /healthz {
+    proxy_pass http://${MINIO_S3_UPSTREAM_HOST}:${MINIO_S3_UPSTREAM_PORT}/minio/health/live;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              ${DOLLAR}host;
+    proxy_set_header X-Real-IP         ${DOLLAR}remote_addr;
+    proxy_set_header X-Forwarded-For   ${DOLLAR}proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+  }
+
+  # S3 API at /
+  location / {
     proxy_pass http://${MINIO_S3_UPSTREAM_HOST}:${MINIO_S3_UPSTREAM_PORT};
     proxy_http_version 1.1;
 

@@ -85,7 +85,10 @@ services:
     container_name: beacon-minio-nginx
     restart: unless-stopped
     environment:
-      - MINIO_SERVER_NAME=${MINIO_SERVER_NAME:-minio.beacon.famillelallier.net}
+      # Console/UI host (served by MinIO console on 9001)
+      - MINIO_CONSOLE_SERVER_NAME=${MINIO_CONSOLE_SERVER_NAME:-minio.beacon.famillelallier.net}
+      # S3 API host (served by MinIO S3 API on 9000)
+      - MINIO_S3_SERVER_NAME=${MINIO_S3_SERVER_NAME:-s3.beacon.famillelallier.net}
       - MINIO_S3_UPSTREAM_HOST=${MINIO_S3_UPSTREAM_HOST:-minio1}
       - MINIO_S3_UPSTREAM_PORT=${MINIO_S3_UPSTREAM_PORT:-9000}
       - MINIO_CONSOLE_UPSTREAM_HOST=${MINIO_CONSOLE_UPSTREAM_HOST:-minio1}
